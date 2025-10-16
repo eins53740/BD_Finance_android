@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "BD_Finance"
+rootProject.name = "BD_Finance_android"
 include(":app")
