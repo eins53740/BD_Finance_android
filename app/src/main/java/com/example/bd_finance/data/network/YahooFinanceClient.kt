@@ -116,6 +116,10 @@ class YahooFinanceClient(
                 trailingPe = quote.optDoubleOrNull("trailingPE"),
                 pegRatio = quote.optDoubleOrNull("pegRatio"),
                 priceToBook = quote.optDoubleOrNull("priceToBook"),
+                dividendRate = quote.optDoubleOrNull("dividendRate")
+                    ?: quote.optDoubleOrNull("trailingAnnualDividendRate"),
+                epsForward = quote.optDoubleOrNull("epsForward"),
+                bookValue = quote.optDoubleOrNull("bookValue"),
                 fiftyTwoWeekHigh = quote.optDoubleOrNull("fiftyTwoWeekHigh"),
                 fiftyTwoWeekLow = quote.optDoubleOrNull("fiftyTwoWeekLow"),
                 dividendYield = quote.optDoubleOrNull("trailingAnnualDividendYield")

@@ -292,6 +292,12 @@ class StockEvaluator(
                 description = null
             ),
             MetricEntry(
+                name = "Trailing P/E",
+                value = quote.trailingPe?.let { "%.1f×".format(it) } ?: "—",
+                status = null,
+                description = null
+            ),
+            MetricEntry(
                 name = "PEG Ratio",
                 value = quote.pegRatio?.let { "%.2f".format(it) } ?: "—",
                 status = decisionMap["growthEfficiency"]?.status,
@@ -319,6 +325,30 @@ class StockEvaluator(
                 name = "Dividend Yield",
                 value = quote.dividendYield?.times(100)?.let { "%.2f%%".format(it) } ?: "—",
                 status = decisionMap["dividend"]?.status,
+                description = null
+            ),
+            MetricEntry(
+                name = "Dividend Rate",
+                value = quote.dividendRate?.let { currencyFormatter(quote.currency).format(it) } ?: "—",
+                status = null,
+                description = null
+            ),
+            MetricEntry(
+                name = "EPS Forward",
+                value = quote.epsForward?.let { "%.2f".format(it) } ?: "—",
+                status = null,
+                description = null
+            ),
+            MetricEntry(
+                name = "Book Value",
+                value = quote.bookValue?.let { currencyFormatter(quote.currency).format(it) } ?: "—",
+                status = null,
+                description = null
+            ),
+            MetricEntry(
+                name = "Price to Book",
+                value = quote.priceToBook?.let { "%.2f×".format(it) } ?: "—",
+                status = null,
                 description = null
             ),
             MetricEntry(

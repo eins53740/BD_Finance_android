@@ -37,7 +37,7 @@ class LargeLanguageModelClient(
         return withContext(Dispatchers.IO) {
             val url = "https://api.groq.com/openai/v1/chat/completions"
             val body = JSONObject().apply {
-                put("model", "llama3-70b-8192")
+                put("model", "llama-3.1-8b-instant")
                 put("temperature", 0.25)
                 put("max_tokens", 600)
                 put(
@@ -85,7 +85,7 @@ class LargeLanguageModelClient(
         if (geminiApiKey.isBlank()) return null
         return withContext(Dispatchers.IO) {
             val url =
-                "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$geminiApiKey"
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=$geminiApiKey"
             val body = JSONObject().apply {
                 put(
                     "contents",
@@ -181,13 +181,13 @@ private object PromptBuilder {
             $momentum
             
             Task:
-            Produce a concise Markdown briefing with:
-            1. An opening verdict sentence.
-            2. A short bullet list of the 2-3 strongest supports.
+            Produce a Markdown briefing that starts with a single line formatted exactly as `Rating: X/10 — <summary>` (where X is an integer from 1 to 10 and 10 means “buy now!”). After the rating line, include:
+            1. An opening verdict paragraph elaborating on the current stance.
+            2. A short bullet list of the 2–3 strongest supports.
             3. A short bullet list of the key risks or watch items.
-            4. A closing recommendation aligned with the verdict.
+            4. A closing recommendation aligned with the verdict that references the rating.
             
-            Tone: analytical, investor-facing, objective.
+            Weigh quantitative metrics and the decision trail when choosing the rating. Tone: analytical, investor-facing, objective.
             $verdictGuidance
         """.trimIndent()
     }
@@ -255,10 +255,10 @@ private object MarkdownRenderer {
 private object OpinionTemplate {
     fun renderFallback(analysis: StockAnalysis): String? {
         val summary = analysis.summary
-        val verdictNarrative = when (summary.verdict) {
-            StockVerdict.BUY -> "Conditions align with a bullish stance."
-            StockVerdict.BUY_WITH_CAUTION -> "Upside exists but investors should size positions carefully."
-            StockVerdict.DO_NOT_BUY -> "Current metrics do not justify a new position."
+        val (rating, ratingBlurb) = when (summary.verdict) {
+            StockVerdict.BUY -> 9 to "Strong fundamental support and attractive upside."
+            StockVerdict.BUY_WITH_CAUTION -> 6 to "Upside exists but positioning should remain cautious."
+            StockVerdict.DO_NOT_BUY -> 3 to "Too many red flags to justify a purchase right now."
         }
         val positive = analysis.decisionTrail
             .filter { it.status == com.example.bd_finance.data.model.DecisionStatus.PASS }
@@ -274,6 +274,12 @@ private object OpinionTemplate {
             }
         val builder = StringBuilder()
         builder.append("<div class=\"llm-opinion\">")
+        builder.append("<p><strong>Rating:</strong> $rating/10 — $ratingBlurb</p>")
+        val verdictNarrative = when (summary.verdict) {
+            StockVerdict.BUY -> "Conditions align with a bullish stance."
+            StockVerdict.BUY_WITH_CAUTION -> "Upside exists but investors should size positions carefully."
+            StockVerdict.DO_NOT_BUY -> "Current metrics do not justify a new position."
+        }
         builder.append("<p><strong>${summary.verdict.headline}:</strong> $verdictNarrative</p>")
         if (positive.isNotBlank()) {
             builder.append("<h3>Supports</h3><ul>$positive</ul>")
