@@ -467,9 +467,10 @@ class StockEvaluator(
     private fun List<HistoricalPrice>.percentChange(periods: Int): Double? {
         if (isEmpty()) return null
         val sorted = sortedBy { it.epochSeconds }
-        if (sorted.size <= periods) return null
+        if (sorted.size == 1) return 0.0
+        val baselineIndex = (sorted.size - periods - 1).coerceAtLeast(0)
         val latest = sorted.last().close
-        val baseline = sorted[sorted.size - periods - 1].close
+        val baseline = sorted[baselineIndex].close
         if (baseline <= 0) return null
         return ((latest - baseline) / baseline) * 100.0
     }

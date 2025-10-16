@@ -74,6 +74,7 @@ import com.example.bd_finance.data.model.formatPercent
 import com.example.bd_finance.R
 import java.text.NumberFormat
 import java.util.Locale
+import org.json.JSONObject
 
 @Composable
 fun StockEvaluatorRoot() {
@@ -760,9 +761,7 @@ private fun MermaidDiagram(definition: String) {
 }
 
 private fun mermaidHtml(definition: String): String {
-    val escaped = definition
-        .replace("\\", "\\\\")
-        .replace("`", "\\`")
+    val jsDefinition = JSONObject.quote(definition)
     return """
         <!DOCTYPE html>
         <html>
@@ -770,7 +769,7 @@ private fun mermaidHtml(definition: String): String {
             <meta charset="utf-8"/>
             <style>
                 :root { color-scheme: light dark; }
-                body { margin: 0; background: transparent; font-family: sans-serif; }
+                body { margin: 0; background: transparent; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
                 #mermaid-root { width: 100%; height: 100%; }
             </style>
             <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
@@ -782,7 +781,7 @@ private fun mermaidHtml(definition: String): String {
                         securityLevel: "loose",
                         theme: prefersDark ? "dark" : "neutral"
                     });
-                    const definition = `$escaped`;
+                    const definition = $jsDefinition;
                     mermaid.mermaidAPI.render("graphDiv", definition, function(svg) {
                         document.getElementById("mermaid-root").innerHTML = svg;
                     });
@@ -819,7 +818,7 @@ private fun LlmOpinionSection(html: String?) {
             )
         }
     }
-    Spacer(modifier = Modifier.height(8.dp))
+    Spacer(modifier = Modifier.height(16.dp))
     SignatureFooter()
 }
 
@@ -847,19 +846,22 @@ private fun HtmlBlock(content: String) {
                             :root { color-scheme: light dark; }
                             body {
                                 margin: 0;
-                                padding: 0.5rem;
+                                padding: 0.7rem;
                                 background: transparent;
                                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                                 color: #1b1b1f;
-                                line-height: 1.45;
+                                line-height: 1.5;
                             }
                             @media (prefers-color-scheme: dark) {
-                                body { color: #f5f2ff; }
-                                a { color: #d0e2ff; }
+                                body {
+                                    color: #f4f3ff;
+                                    text-shadow: 0 0 4px rgba(0, 0, 0, 0.65);
+                                }
+                                a { color: #ddebff; }
                             }
-                            h2, h3 { margin-top: 0.75rem; margin-bottom: 0.35rem; }
-                            ul { padding-left: 1.3rem; margin-top: 0.35rem; margin-bottom: 0.4rem; }
-                            li { margin-bottom: 0.3rem; }
+                            h2, h3 { margin-top: 0.75rem; margin-bottom: 0.4rem; }
+                            ul { padding-left: 1.35rem; margin-top: 0.4rem; margin-bottom: 0.45rem; }
+                            li { margin-bottom: 0.32rem; }
                             strong { font-weight: 600; }
                         </style>
                     </head>
@@ -917,7 +919,7 @@ private fun SignatureFooter() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 8.dp, bottom = 4.dp),
+            .padding(top = 12.dp, bottom = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -929,7 +931,7 @@ private fun SignatureFooter() {
         Text(
             text = "BD Finance 2025\u2122 — from BD, to my friends",
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
         )
     }
 }
