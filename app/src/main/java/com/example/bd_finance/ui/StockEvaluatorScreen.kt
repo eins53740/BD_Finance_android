@@ -763,7 +763,6 @@ private fun mermaidHtml(definition: String): String {
     val escaped = definition
         .replace("\\", "\\\\")
         .replace("`", "\\`")
-        .replace("\$", "\\$")
     return """
         <!DOCTYPE html>
         <html>
@@ -772,20 +771,26 @@ private fun mermaidHtml(definition: String): String {
             <style>
                 :root { color-scheme: light dark; }
                 body { margin: 0; background: transparent; font-family: sans-serif; }
-                .mermaid { width: 100%; height: 100%; }
-                @media (prefers-color-scheme: dark) {
-                    body { color: #e4e2ff; }
-                }
+                #mermaid-root { width: 100%; height: 100%; }
             </style>
             <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
             <script>
                 document.addEventListener("DOMContentLoaded", function() {
-                    mermaid.initialize({ startOnLoad: true, securityLevel: "loose", theme: "neutral" });
+                    const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+                    mermaid.initialize({
+                        startOnLoad: false,
+                        securityLevel: "loose",
+                        theme: prefersDark ? "dark" : "neutral"
+                    });
+                    const definition = `$escaped`;
+                    mermaid.mermaidAPI.render("graphDiv", definition, function(svg) {
+                        document.getElementById("mermaid-root").innerHTML = svg;
+                    });
                 });
             </script>
         </head>
         <body>
-            <div class="mermaid">$escaped</div>
+            <div id="mermaid-root"></div>
         </body>
         </html>
     """.trimIndent()
@@ -845,15 +850,17 @@ private fun HtmlBlock(content: String) {
                                 padding: 0.5rem;
                                 background: transparent;
                                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                                color: #1d1b20;
+                                color: #1b1b1f;
+                                line-height: 1.45;
                             }
                             @media (prefers-color-scheme: dark) {
-                                body { color: #e6e1e5; }
-                                a { color: #aad1ff; }
+                                body { color: #f5f2ff; }
+                                a { color: #d0e2ff; }
                             }
-                            h2, h3 { margin-top: 0.75rem; margin-bottom: 0.25rem; }
-                            ul { padding-left: 1.2rem; margin-top: 0.25rem; }
-                            li { margin-bottom: 0.25rem; }
+                            h2, h3 { margin-top: 0.75rem; margin-bottom: 0.35rem; }
+                            ul { padding-left: 1.3rem; margin-top: 0.35rem; margin-bottom: 0.4rem; }
+                            li { margin-bottom: 0.3rem; }
+                            strong { font-weight: 600; }
                         </style>
                     </head>
                     <body>${content}</body>
@@ -922,7 +929,7 @@ private fun SignatureFooter() {
         Text(
             text = "BD Finance 2025\u2122 — from BD, to my friends",
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
         )
     }
 }
