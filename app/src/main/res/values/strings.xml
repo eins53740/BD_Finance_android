@@ -1,0 +1,20 @@
+<resources>
+    <string name="app_name">BD Finance</string>
+    <string name="ticker_input_hint">Enter stock ticker (e.g., AAPL)</string>
+    <string name="analyze_button">Analyze</string>
+    <string name="analysis_loading">Analyzing %1$s...</string>
+    <string name="analysis_error_title">Analysis unavailable</string>
+    <string name="analysis_error_message">We couldn\'t finish the evaluation for %1$s. Try again in a moment.</string>
+    <string name="section_decision_trail">Decision Trail</string>
+    <string name="section_metrics">Key Metrics</string>
+    <string name="section_risk">Risk Insights</string>
+    <string name="section_momentum">Momentum</string>
+    <string name="section_peers">Peer Comparison</string>
+    <string name="section_dividend">Dividend Outlook</string>
+    <string name="section_mermaid">Decision Flow</string>
+    <string name="section_llm">Second Opinion</string>
+    <string name="last_updated">Updated %1$s</string>
+    <string name="empty_state_title">Run Your First Analysis</string>
+    <string name="empty_state_message">Supply a stock ticker to review fundamentals, risk, a flowchart, and an AI perspective.</string>
+    <string name="llm_missing">Second opinion unavailable: configure Groq or Gemini API keys in gradle.properties.</string>
+</resources>
