@@ -73,7 +73,6 @@ import com.example.bd_finance.data.model.VerdictColor
 import com.example.bd_finance.data.model.formatPercent
 import com.example.bd_finance.R
 import java.text.NumberFormat
-import java.util.Locale
 import org.json.JSONObject
 
 @Composable
@@ -215,12 +214,12 @@ private fun EmptyState() {
                 modifier = Modifier.size(48.dp)
             )
             Text(
-                text = "Run Your First Analysis",
+                text = stringResource(R.string.empty_state_title),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Medium
             )
             Text(
-                text = "Supply a stock ticker to review fundamentals, risk, a flowchart, and an AI perspective.",
+                text = stringResource(R.string.empty_state_message),
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center
             )
@@ -244,7 +243,7 @@ private fun LoadingState(ticker: String) {
             CircularProgressIndicator()
             Column {
                 Text(
-                    text = "Analyzing $ticker…",
+                    text = stringResource(R.string.analysis_loading, ticker),
                     style = MaterialTheme.typography.titleMedium
                 )
                 Text(
@@ -396,7 +395,7 @@ private fun SummaryCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Updated ${summary.updatedAt.toDisplayString()}",
+                    text = stringResource(R.string.last_updated, summary.updatedAt.toDisplayString()),
                     style = MaterialTheme.typography.bodySmall
                 )
                 TextButton(onClick = onRefresh) {
@@ -619,7 +618,7 @@ private fun MomentumSection(insights: List<MomentumInsight>) {
                     fontWeight = FontWeight.Medium
                 )
                 Text(
-                    text = String.format("%.2f%%", insight.percentChange),
+                    text = String.format(java.util.Locale.US, "%.2f%%", insight.percentChange),
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
@@ -670,9 +669,10 @@ private fun PeerSection(peers: List<PeerComparison>, currency: String?) {
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
-                    peer.performanceDelta?.let {
+                    peer.performanceDelta?.let { delta ->
+                        val deltaText = String.format(java.util.Locale.US, "%.2f%%", delta)
                         Text(
-                            text = "Δ vs primary: ${String.format("%.2f%%", it)}",
+                            text = "Δ vs primary: $deltaText",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
@@ -690,6 +690,12 @@ private fun DividendSection(dividendInsight: DividendInsight?) {
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.SemiBold
     )
+    val yieldText = dividendInsight.yield?.let { value ->
+        String.format(java.util.Locale.US, "%.2f%%", value)
+    } ?: "�"
+    val payoutText = dividendInsight.payoutRatio?.let { ratio ->
+        String.format(java.util.Locale.US, "%.0f%%", ratio * 100)
+    } ?: "�"
     Card(
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -698,11 +704,11 @@ private fun DividendSection(dividendInsight: DividendInsight?) {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = "Yield: ${dividendInsight.yield?.let { String.format("%.2f%%", it) } ?: "—"}",
+                text = "Yield: $yieldText",
                 style = MaterialTheme.typography.bodyMedium
             )
             Text(
-                text = "Payout ratio: ${dividendInsight.payoutRatio?.let { String.format("%.0f%%", it * 100) } ?: "—"}",
+                text = "Payout ratio: $payoutText",
                 style = MaterialTheme.typography.bodyMedium
             )
             Text(
@@ -904,7 +910,7 @@ private fun verdictColors(verdict: StockVerdict): VerdictColors {
 }
 
 private fun currencyFormatter(currency: String? = "USD"): NumberFormat =
-    NumberFormat.getCurrencyInstance(Locale.US).apply {
+    NumberFormat.getCurrencyInstance(java.util.Locale.US).apply {
         currency?.let {
             try {
                 this.currency = java.util.Currency.getInstance(it)
@@ -935,4 +941,3 @@ private fun SignatureFooter() {
         )
     }
 }
-

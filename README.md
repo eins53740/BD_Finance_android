@@ -47,3 +47,7 @@ Created by **BD** – a retail-investor-friendly tool shared with friends who wa
 Issues and improvements are welcome via pull requests. When reporting bugs, include the ticker, device/emulator, and console logs (especially around Yahoo/Groq/Gemini calls) so we can reproduce quickly.
 
 Enjoy the insights and happy investing! 🎯
+## Background Sync & Data Sources
+- Yahoo Finance remains the primary live quote provider.
+- Alpha Vantage acts as a free fallback for PEG, beta, and supplementary fundamentals (set `ALPHA_VANTAGE_API_KEY` in `gradle.properties`).
+- WorkManager schedules periodic refreshes that hydrate a Room-backed metrics cache consumed by the Compose UI.

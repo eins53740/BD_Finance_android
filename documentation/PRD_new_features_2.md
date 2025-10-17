@@ -22,10 +22,12 @@ Deliver a comprehensive, data-driven investment assistant that blends quantitati
 > Existing v1 capabilities (ticker intake, evaluation engine, Mermaid flow, LLM second opinion) must remain untouched. New features should integrate with, not replace, the current codebase.
 
 ### Epic 1 - Multi-Source Data Collection & Normalisation
+_Status: ✅ Completed for v0.2 (Yahoo + Alpha Vantage connectors, normalization layer, Room cache, and scheduled refresh validated with clean lint/tests)_
 **Goal:** Enrich the Android client's data via a unifying service that consolidates Yahoo, Alpha Vantage, Finnhub/FMP, and optional CSV imports.
-- F1.1 Data Connectors - Add modular adapters with secure API key management.
-- F1.2 Normalisation Layer - Standardise ratios (EPS, PE, PEG, EV/EBIT, P/B, FCF yield) into a shared schema stored in SQLite/on-device cache.
-- F1.3 Scheduler Hooks - Support automated refresh jobs (WorkManager on Android; optional cron for desktop backend) feeding the APK through a sync API.
+- [x] F1.1 Data Connectors - Add modular adapters with secure API key management.
+- [x] F1.2 Normalisation Layer - Standardise ratios (EPS, PE, PEG, EV/EBIT, P/B, FCF yield) into a shared schema stored in SQLite/on-device cache.
+- [x] F1.3 Scheduler Hooks - Support automated refresh jobs (WorkManager on Android; optional cron for desktop backend) feeding the APK through a sync API.
+    **Validation:** Run `./gradlew lint test`; inspect `app/build/reports/lint-results-debug.html`; trigger `StockMetricsSyncScheduler.schedule` at app start and confirm `stock_metrics.db` persists merged Yahoo/Alpha Vantage values via Room inspector.
 
 ### Epic 2 - Fundamental Analysis Extensions
 **Goal:** Expand valuation, profitability, and growth scoring while keeping the existing verdict logic.
@@ -34,6 +36,15 @@ Deliver a comprehensive, data-driven investment assistant that blends quantitati
 - F2.3 Growth Trends - Render 5Y/10Y CAGR for revenue, EPS, FCF with acceleration/decay indicators.
 - F2.4 Intrinsic Value Models - Implement DCF, Ben Graham, and DDM calculators surfaced alongside the current decision verdict.
 - F2.5 Historical Context - Show deviations from historical averages (e.g., current P/E vs decade mean).
+
+**Implementation Notes (pending approval):**
+- **Data feeds & reliability:** Anchor sector medians/averages on FMP as the primary source with Alpha Vantage fallback when the FMP quota is exhausted. Wrap requests with exponential backoff and surface retry counts to the normalization service so the UI can flag stale sector data. Document rate-limit ceilings and refresh cadence (hourly for current ratios, weekly for decade medians).
+- **Historical fundamentals storage:** Persist 5Y and 10Y time-series per metric (P/E, P/B, ROE, operating margin, net margin) as compressed JSON blobs keyed by ticker + metric + horizon. Store both raw yearly points and pre-computed medians so simple deltas stay O(1). Backfill on first sync and record the snapshot date to make cache invalidation explicit.
+- **Normalization & scoring formulas:** Keep verdict logic unchanged by introducing a parallel `fundamentalScore` payload. Valuation scoring blends current vs sector (60%) and current vs 10Y (40%) deltas with z-score caps at ±3 to tame outliers. Clarify weighting in README and expose coefficients via remote config so QA can tweak without redeploy. Guard against divide-by-zero by short-circuiting to neutral scores when denominators are null.
+- **Profitability & stability calculations:** Standardize ROE, ROA, debt-to-equity, and margin variance within the normalized dataset. Flag missing components (e.g., absent equity value) and propagate "insufficient data" tags down to the scoring engine to avoid misleading positives.
+- **Intrinsic value assumptions:** Use a shared discount-rate helper defaulting to `max(8%, risk_free + 5%)`, cap growth at 15%, and union the calculators behind a common interface. When cash flows or dividends are negative/zero, degrade gracefully with an explanatory status string instead of showing inflated valuations.
+- **UI presentation:** Start with textual "current vs average" diffs and band labels (Cheap/Fair/Expensive) to limit Compose chart churn. Leave room for charts in v2.1 once the data stabilises. Cards must show the data timestamp and data quality badge ("live", "cached", "fallback").
+- **Testing & tooling:** Add contract tests for the new provider adapters, deterministic fixtures for sector + decade data, and snapshot/unit tests covering valuation bands and missing-data paths. Update lint configs only if new detectors block the build; otherwise keep existing tooling untouched.
 
 ### Epic 3 - Technical & Momentum Toolkit
 **Goal:** Provide entry/exit timing insight to complement fundamentals.
