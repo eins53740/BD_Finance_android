@@ -11,7 +11,7 @@ on:
       - ".github/workflows/backend-ci.yml"
 
 env:
-  WORKDIR: BD_Finance_android
+#  WORKDIR: BD_Finance_android
   PYTHON_VERSION: "3.11"
 
 jobs:
