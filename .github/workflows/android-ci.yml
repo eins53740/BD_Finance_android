@@ -2,7 +2,7 @@ name: Android CI
 
 on:
   push:
-    branches: [ main, develop, EP03_PRD2 ]
+    branches: [ main]
     paths:
       - "app/**"
       - "gradle/**"
@@ -12,7 +12,7 @@ on:
       - "lint.xml"
       - ".github/workflows/android-ci.yml"
   pull_request:
-    branches: [ main, develop, EP03_PRD2 ]
+    branches: [ main]
     paths:
       - "app/**"
       - "gradle/**"
