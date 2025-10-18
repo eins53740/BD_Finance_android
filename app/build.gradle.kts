@@ -1,4 +1,5 @@
 plugins {
+    kotlin("kapt")
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
@@ -7,8 +8,33 @@ plugins {
 fun escapeForBuildConfig(value: String): String =
     value.replace("\\", "\\\\").replace("\"", "\\\"")
 
-val groqApiKey = escapeForBuildConfig(project.findProperty("GROQ_API_KEY") as String? ?: "")
-val geminiApiKey = escapeForBuildConfig(project.findProperty("GEMINI_API_KEY") as String? ?: "")
+fun loadDotEnv(): Map<String, String> {
+    val envFile = rootProject.file(".env")
+    if (!envFile.exists()) return emptyMap()
+    return envFile.readLines()
+        .map { it.trim() }
+        .filter { it.isNotEmpty() && !it.startsWith("#") }
+        .mapNotNull { line ->
+            val separatorIndex = line.indexOf('=')
+            if (separatorIndex <= 0) return@mapNotNull null
+            val key = line.substring(0, separatorIndex).trim()
+            val value = line.substring(separatorIndex + 1).trim().trim('"')
+            key to value
+        }.toMap()
+}
+
+val dotenv = loadDotEnv()
+
+fun resolveSecret(name: String): String =
+    (project.findProperty(name) as String?)
+        ?: System.getenv(name)
+        ?: dotenv[name]
+        ?: ""
+
+val groqApiKey = escapeForBuildConfig(resolveSecret("GROQ_API_KEY"))
+val geminiApiKey = escapeForBuildConfig(resolveSecret("GEMINI_API_KEY"))
+val alphaVantageKey = escapeForBuildConfig(resolveSecret("ALPHA_VANTAGE_API_KEY"))
+val fmpApiKey = escapeForBuildConfig(resolveSecret("FMP_API_KEY"))
 
 android {
     namespace = "com.example.bd_finance"
@@ -26,6 +52,8 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "GROQ_API_KEY", "\"$groqApiKey\"")
         buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
+        buildConfigField("String", "ALPHA_VANTAGE_API_KEY", "\"$alphaVantageKey\"")
+        buildConfigField("String", "FMP_API_KEY", "\"$fmpApiKey\"")
         buildConfigField("Long", "CACHE_TTL_MS", "600000L")
     }
 
@@ -65,6 +93,9 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.okhttp)
     implementation(libs.okhttp.urlconnection)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.okhttp.logging)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
@@ -73,4 +104,12 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+    kapt(libs.androidx.room.compiler)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.androidx.room.testing)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.androidx.work.testing)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.okhttp.mockwebserver)
+    testImplementation("org.json:json:20231013")
 }

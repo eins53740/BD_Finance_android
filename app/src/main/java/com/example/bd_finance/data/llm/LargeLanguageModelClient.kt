@@ -12,6 +12,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
+import java.util.Locale
 
 class LargeLanguageModelClient(
     private val httpClient: OkHttpClient,
@@ -154,7 +155,7 @@ private object PromptBuilder {
             "- ${it.title}: ${it.summary} (${it.scoreLabel})"
         }
         val momentum = analysis.momentumInsights.joinToString(separator = "\n") {
-            "- ${it.periodLabel}: ${String.format("%.2f%%", it.percentChange)}"
+            "- ${it.periodLabel}: ${String.format(Locale.US, "%.2f%%", it.percentChange)}"
         }
         val verdictGuidance = when (analysis.summary.verdict) {
             StockVerdict.BUY -> "Provide a confident but risk-aware buy viewpoint."
@@ -181,9 +182,9 @@ private object PromptBuilder {
             $momentum
             
             Task:
-            Produce a Markdown briefing that starts with a single line formatted exactly as `Rating: X/10 — <summary>` (where X is an integer from 1 to 10 and 10 means “buy now!”). After the rating line, include:
+            Produce a Markdown briefing that starts with a single line formatted exactly as `Rating: X/10 - <summary>` (where X is an integer from 1 to 10 and 10 means "buy now!"). After the rating line, include:
             1. An opening verdict paragraph elaborating on the current stance.
-            2. A short bullet list of the 2–3 strongest supports.
+            2. A short bullet list of the 2-3 strongest supports.
             3. A short bullet list of the key risks or watch items.
             4. A closing recommendation aligned with the verdict that references the rating.
             
@@ -291,3 +292,7 @@ private object OpinionTemplate {
         return builder.toString()
     }
 }
+
+
+
+

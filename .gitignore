@@ -40,3 +40,5 @@ google-services.json
 
 # Android Profiling
 *.hprof
+tools/OpenJDK17.zip
+tools/OpenJDK17/jdk-17.0.11+9/lib/modules

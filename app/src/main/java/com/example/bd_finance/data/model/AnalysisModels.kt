@@ -103,8 +103,99 @@ data class StockAnalysis(
     val peerComparisons: List<PeerComparison>,
     val dividendInsight: DividendInsight?,
     val mermaidDefinition: String,
-    val llmOpinionHtml: String?
+    val llmOpinionHtml: String?,
+    val fundamentalInsights: FundamentalInsights? = null,
+    val intrinsicValuations: List<IntrinsicValuation> = emptyList()
 )
+
+data class FundamentalInsights(
+    val valuationScores: List<FundamentalMetricScore>,
+    val profitabilityScores: List<FundamentalMetricScore>,
+    val stabilityScores: List<FundamentalMetricScore>,
+    val growth: GrowthInsights,
+    val historicalDeltas: List<HistoricalDelta>,
+    val metadata: FundamentalDataMetadata
+)
+
+data class FundamentalMetricScore(
+    val id: String,
+    val label: String,
+    val score: Int?,
+    val status: MetricStrength,
+    val currentValue: String,
+    val sectorBenchmark: String?,
+    val decadeAverage: String?,
+    val note: String? = null
+)
+
+enum class MetricStrength {
+    STRONG,
+    NEUTRAL,
+    WEAK,
+    UNKNOWN
+}
+
+data class GrowthInsights(
+    val revenue: GrowthMetric?,
+    val earningsPerShare: GrowthMetric?,
+    val freeCashFlow: GrowthMetric?,
+    val commentary: String?
+)
+
+data class GrowthMetric(
+    val label: String,
+    val fiveYearCagr: Double?,
+    val tenYearCagr: Double?,
+    val trend: GrowthTrend
+)
+
+enum class GrowthTrend {
+    ACCELERATING,
+    DECELERATING,
+    MIXED,
+    UNKNOWN
+}
+
+data class HistoricalDelta(
+    val label: String,
+    val currentValue: String,
+    val referenceValue: String?,
+    val deltaPercent: Double?
+)
+
+data class FundamentalDataMetadata(
+    val lastUpdatedMillis: Long,
+    val usedFallback: Boolean,
+    val source: String?
+)
+
+data class IntrinsicValuation(
+    val model: IntrinsicModel,
+    val intrinsicValue: Double?,
+    val priceRatio: Double?,
+    val band: ValuationBand,
+    val assumptions: String,
+    val status: IntrinsicValuationStatus
+)
+
+enum class IntrinsicModel {
+    DISCOUNTED_CASH_FLOW,
+    BEN_GRAHAM,
+    DIVIDEND_DISCOUNT
+}
+
+enum class IntrinsicValuationStatus {
+    AVAILABLE,
+    INSUFFICIENT_DATA,
+    INVALID
+}
+
+enum class ValuationBand {
+    CHEAP,
+    FAIR,
+    EXPENSIVE,
+    UNKNOWN
+}
 
 data class StockQuote(
     val ticker: String,
