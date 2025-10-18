@@ -3,15 +3,15 @@ name: backend-ci
 on:
   push:
     paths:
-      - "FlowchartStocks/stock-evaluator/**"
+      - "BD_Finance_android/**"
       - ".github/workflows/backend-ci.yml"
   pull_request:
     paths:
-      - "FlowchartStocks/stock-evaluator/**"
+      - "BD_Finance_android/**"
       - ".github/workflows/backend-ci.yml"
 
 env:
-  WORKDIR: FlowchartStocks/stock-evaluator
+  WORKDIR: FBD_Finance_android
   PYTHON_VERSION: "3.11"
 
 jobs:
