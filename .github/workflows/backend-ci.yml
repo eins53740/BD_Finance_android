@@ -3,15 +3,15 @@ name: backend-ci
 on:
   push:
     paths:
-      - "BD_Finance_android/**"
+      - "**"
       - ".github/workflows/backend-ci.yml"
   pull_request:
     paths:
-      - "BD_Finance_android/**"
+      - "**"
       - ".github/workflows/backend-ci.yml"
 
 env:
-  WORKDIR: FBD_Finance_android
+  WORKDIR: BD_Finance_android
   PYTHON_VERSION: "3.11"
 
 jobs:
