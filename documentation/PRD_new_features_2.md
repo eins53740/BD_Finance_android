@@ -38,6 +38,14 @@ _Status: ✅ Completed for v0.2 (Yahoo + Alpha Vantage connectors, normalization
 - F2.5 Historical Context - Show deviations from historical averages (e.g., current P/E vs decade mean).
 
 **Implementation Notes (pending approval):**
+**Epic 2 Status (v0.2 implementation):**
+- [x] Sector medians + historical fundamentals persisted via FMP/Alpha Vantage connectors and Room migrations.
+- [x] Fundamental scorecard calculates valuation, profitability, stability, and growth metrics without altering verdict logic.
+- [x] Intrinsic value models (DCF, Ben Graham, DDM) surface normalized bands alongside decision verdict.
+- [x] UI adds scorecard, growth trends, valuation bands, and metadata notes in the analysis view.
+- [x] Added unit coverage for data sync connectors and fundamental calculators with deterministic fixtures.
+
+
 - **Data feeds & reliability:** Anchor sector medians/averages on FMP as the primary source with Alpha Vantage fallback when the FMP quota is exhausted. Wrap requests with exponential backoff and surface retry counts to the normalization service so the UI can flag stale sector data. Document rate-limit ceilings and refresh cadence (hourly for current ratios, weekly for decade medians).
 - **Historical fundamentals storage:** Persist 5Y and 10Y time-series per metric (P/E, P/B, ROE, operating margin, net margin) as compressed JSON blobs keyed by ticker + metric + horizon. Store both raw yearly points and pre-computed medians so simple deltas stay O(1). Backfill on first sync and record the snapshot date to make cache invalidation explicit.
 - **Normalization & scoring formulas:** Keep verdict logic unchanged by introducing a parallel `fundamentalScore` payload. Valuation scoring blends current vs sector (60%) and current vs 10Y (40%) deltas with z-score caps at ±3 to tame outliers. Clarify weighting in README and expose coefficients via remote config so QA can tweak without redeploy. Guard against divide-by-zero by short-circuiting to neutral scores when denominators are null.

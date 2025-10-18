@@ -5,6 +5,8 @@ import com.example.bd_finance.BuildConfig
 import com.example.bd_finance.data.analysis.EvaluationThresholds
 import com.example.bd_finance.data.analysis.MermaidDefinitionBuilder
 import com.example.bd_finance.data.analysis.StockEvaluator
+import com.example.bd_finance.data.fundamentals.FundamentalAnalysisEngine
+import com.example.bd_finance.data.fundamentals.FundamentalAnalysisResult
 import com.example.bd_finance.data.llm.LargeLanguageModelClient
 import com.example.bd_finance.data.model.DecisionStatus
 import com.example.bd_finance.data.model.PeerComparison
@@ -12,6 +14,8 @@ import com.example.bd_finance.data.model.StockAnalysis
 import com.example.bd_finance.data.model.StockQuote
 import com.example.bd_finance.data.model.StockVerdict
 import com.example.bd_finance.data.network.YahooFinanceClient
+import com.example.bd_finance.data.sync.StockMetricsAggregator
+import com.example.bd_finance.data.sync.StockMetricsSyncModule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -30,6 +34,7 @@ class StockAnalysisRepository(
     private val evaluator: StockEvaluator,
     private val mermaidBuilder: MermaidDefinitionBuilder,
     private val llmClient: LargeLanguageModelClient?,
+    private val fundamentalEngine: FundamentalAnalysisEngine?,
     private val cacheTtlMillis: Long = BuildConfig.CACHE_TTL_MS
 ) {
 
@@ -78,6 +83,9 @@ class StockAnalysisRepository(
             history = history,
             peerComparisons = peerComparisons
         )
+        val fundamentalResult: FundamentalAnalysisResult? = runCatching {
+            fundamentalEngine?.analyze(ticker, quote)
+        }.onFailure { Log.w(TAG, "Fundamental analysis failed: ${it.message}") }.getOrNull()
 
         val analysis = evaluationResult.analysis.copy(
             mermaidDefinition = mermaidBuilder.build(
@@ -93,7 +101,9 @@ class StockAnalysisRepository(
         }.getOrNull()
 
         return@coroutineScope analysis.copy(
-            llmOpinionHtml = llmOpinion
+            llmOpinionHtml = llmOpinion,
+            fundamentalInsights = fundamentalResult?.insights,
+            intrinsicValuations = fundamentalResult?.valuations ?: emptyList()
         )
     }
 
@@ -193,11 +203,15 @@ class StockAnalysisRepository(
                 groqApiKey = BuildConfig.GROQ_API_KEY,
                 geminiApiKey = BuildConfig.GEMINI_API_KEY
             )
+            val aggregator: StockMetricsAggregator =
+                StockMetricsSyncModule.provideAggregator(client, financeClient)
+            val fundamentalEngine = FundamentalAnalysisEngine(aggregator)
             return StockAnalysisRepository(
                 financeClient = financeClient,
                 evaluator = evaluator,
                 mermaidBuilder = mermaidBuilder,
-                llmClient = llmClient
+                llmClient = llmClient,
+                fundamentalEngine = fundamentalEngine
             )
         }
     }

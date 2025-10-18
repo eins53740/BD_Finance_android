@@ -130,7 +130,11 @@ enum class FundamentalMetric {
     PRICE_TO_BOOK,
     RETURN_ON_EQUITY,
     OPERATING_MARGIN,
-    NET_MARGIN
+    NET_MARGIN,
+    DEBT_TO_EQUITY,
+    REVENUE,
+    EARNINGS_PER_SHARE,
+    FREE_CASH_FLOW
 }
 
 data class HistoricalMetricWindow(

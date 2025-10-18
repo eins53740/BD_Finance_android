@@ -65,6 +65,18 @@ import com.example.bd_finance.data.model.DecisionStatus
 import com.example.bd_finance.data.model.DividendInsight
 import com.example.bd_finance.data.model.MomentumInsight
 import com.example.bd_finance.data.model.MetricEntry
+import com.example.bd_finance.data.model.FundamentalInsights
+import com.example.bd_finance.data.model.FundamentalMetricScore
+import com.example.bd_finance.data.model.FundamentalDataMetadata
+import com.example.bd_finance.data.model.HistoricalDelta
+import com.example.bd_finance.data.model.GrowthInsights
+import com.example.bd_finance.data.model.GrowthMetric
+import com.example.bd_finance.data.model.GrowthTrend
+import com.example.bd_finance.data.model.IntrinsicModel
+import com.example.bd_finance.data.model.IntrinsicValuation
+import com.example.bd_finance.data.model.IntrinsicValuationStatus
+import com.example.bd_finance.data.model.MetricStrength
+import com.example.bd_finance.data.model.ValuationBand
 import com.example.bd_finance.data.model.PeerComparison
 import com.example.bd_finance.data.model.RiskInsight
 import com.example.bd_finance.data.model.StockAnalysis
@@ -73,6 +85,8 @@ import com.example.bd_finance.data.model.VerdictColor
 import com.example.bd_finance.data.model.formatPercent
 import com.example.bd_finance.R
 import java.text.NumberFormat
+import java.time.Instant
+import java.util.Locale
 import org.json.JSONObject
 
 @Composable
@@ -312,6 +326,12 @@ private fun AnalysisContent(
     ) {
         SummaryCard(analysis, onRefresh)
         MetricsSection(analysis.metrics)
+        FundamentalsSection(analysis.fundamentalInsights)
+        IntrinsicValuationsSection(
+            valuations = analysis.intrinsicValuations,
+            price = analysis.summary.price,
+            currency = analysis.summary.currency
+        )
         DecisionTrailSection(analysis)
         RiskSection(analysis.riskInsights)
         MomentumSection(analysis.momentumInsights)
@@ -419,6 +439,345 @@ private fun MetricsSection(metrics: List<MetricEntry>) {
             MetricCard(metric)
         }
     }
+}
+
+@Composable
+private fun FundamentalsSection(insights: FundamentalInsights?) {
+    insights ?: return
+    Text(
+        text = "Fundamental Scorecard",
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold
+    )
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (insights.valuationScores.isNotEmpty()) {
+                Text(
+                    text = "Valuation",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium
+                )
+                insights.valuationScores.forEach { FundamentalMetricRow(it) }
+            }
+            if (insights.profitabilityScores.isNotEmpty()) {
+                Text(
+                    text = "Profitability",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium
+                )
+                insights.profitabilityScores.forEach { FundamentalMetricRow(it) }
+            }
+            if (insights.stabilityScores.isNotEmpty()) {
+                Text(
+                    text = "Stability",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium
+                )
+                insights.stabilityScores.forEach { FundamentalMetricRow(it) }
+            }
+            val growth = insights.growth
+            if (growth.revenue != null || growth.earningsPerShare != null || growth.freeCashFlow != null) {
+                Text(
+                    text = "Growth Trends",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium
+                )
+                listOfNotNull(growth.revenue, growth.earningsPerShare, growth.freeCashFlow)
+                    .forEach { GrowthMetricRow(it) }
+                growth.commentary?.let {
+                    Text(
+                        text = it.trim(),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+            if (insights.historicalDeltas.isNotEmpty()) {
+                Text(
+                    text = "Historical Context",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium
+                )
+                insights.historicalDeltas.forEach { HistoricalDeltaRow(it) }
+            }
+            Text(
+                text = fundamentalsMetadataLabel(insights.metadata),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun FundamentalMetricRow(score: FundamentalMetricScore) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = score.label,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                score.score?.let {
+                    Text(
+                        text = "${'$'}it / 100",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                MetricStrengthChip(score.status)
+            }
+        }
+        Text(
+            text = "Current: ${'$'}{score.currentValue}",
+            style = MaterialTheme.typography.bodySmall
+        )
+        score.sectorBenchmark?.let {
+            Text(
+                text = "Sector: ${'$'}it",
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+        score.decadeAverage?.let {
+            Text(
+                text = "10Y: ${'$'}it",
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+        score.note?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun MetricStrengthChip(strength: MetricStrength) {
+    val (bg, fg) = when (strength) {
+        MetricStrength.STRONG -> MaterialTheme.colorScheme.tertiary to MaterialTheme.colorScheme.onTertiary
+        MetricStrength.NEUTRAL -> MaterialTheme.colorScheme.secondary to MaterialTheme.colorScheme.onSecondary
+        MetricStrength.WEAK -> MaterialTheme.colorScheme.error to MaterialTheme.colorScheme.onError
+        MetricStrength.UNKNOWN -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    AssistChip(
+        onClick = {},
+        label = {
+            Text(
+                text = when (strength) {
+                    MetricStrength.STRONG -> "Strong"
+                    MetricStrength.NEUTRAL -> "Neutral"
+                    MetricStrength.WEAK -> "Weak"
+                    MetricStrength.UNKNOWN -> "Unknown"
+                }
+            )
+        },
+        enabled = false,
+        colors = AssistChipDefaults.assistChipColors(
+            containerColor = bg,
+            labelColor = fg
+        )
+    )
+}
+
+@Composable
+private fun GrowthMetricRow(metric: GrowthMetric) {
+    val fiveYear = metric.fiveYearCagr?.let { String.format(Locale.US, "%.2f%%", it * 100) } ?: "-"
+    val tenYear = metric.tenYearCagr?.let { String.format(Locale.US, "%.2f%%", it * 100) } ?: "-"
+    val trendLabel = when (metric.trend) {
+        GrowthTrend.ACCELERATING -> "Accelerating"
+        GrowthTrend.DECELERATING -> "Decelerating"
+        GrowthTrend.MIXED -> "Mixed"
+        GrowthTrend.UNKNOWN -> "Unknown"
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+            .padding(12.dp)
+    ) {
+        Text(
+            text = metric.label,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium
+        )
+        Text(
+            text = "5Y: $fiveYear | 10Y: $tenYear",
+            style = MaterialTheme.typography.bodySmall
+        )
+        Text(
+            text = trendLabel,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun HistoricalDeltaRow(delta: HistoricalDelta) {
+    val deltaText = delta.deltaPercent?.let { String.format(Locale.US, "%+.2f%%", it) } ?: "-"
+    val referenceValue = delta.referenceValue ?: "-"
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+            .padding(12.dp)
+    ) {
+        Text(
+            text = delta.label,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium
+        )
+        Text(
+            text = "Current: ${delta.currentValue} | Ref: $referenceValue",
+            style = MaterialTheme.typography.bodySmall
+        )
+        Text(
+            text = "Delta: $deltaText",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+private fun fundamentalsMetadataLabel(metadata: FundamentalDataMetadata): String {
+    val timestamp = Instant.ofEpochMilli(metadata.lastUpdatedMillis).toDisplayString()
+    val fallback = if (metadata.usedFallback) " | fallback" else ""
+    val source = metadata.source?.let { " | $it" } ?: ""
+    return "Data synced $timestamp$fallback$source"
+}
+
+@Composable
+private fun IntrinsicValuationsSection(
+    valuations: List<IntrinsicValuation>,
+    price: Double?,
+    currency: String?
+) {
+    if (valuations.isEmpty()) return
+    Text(
+        text = "Intrinsic Value Models",
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold
+    )
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            valuations.forEach { IntrinsicValuationRow(it, price, currency) }
+        }
+    }
+}
+
+@Composable
+private fun IntrinsicValuationRow(valuation: IntrinsicValuation, price: Double?, currency: String?) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = intrinsicModelLabel(valuation.model),
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium
+            )
+            ValuationBandChip(valuation.band)
+        }
+        val formatter = currencyFormatter(currency)
+        when (valuation.status) {
+            IntrinsicValuationStatus.AVAILABLE -> {
+                val intrinsicText = valuation.intrinsicValue?.let { formatter.format(it) } ?: "-"
+                val priceText = price?.let { formatter.format(it) } ?: "-"
+                val ratioText = valuation.priceRatio?.let { String.format(Locale.US, "%.0f%% of price", it * 100) } ?: "-"
+                Text(
+                    text = "Intrinsic: $intrinsicText",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Text(
+                    text = "Market: $priceText | $ratioText",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            IntrinsicValuationStatus.INSUFFICIENT_DATA -> {
+                Text(
+                    text = "Insufficient data",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            IntrinsicValuationStatus.INVALID -> {
+                Text(
+                    text = "Unable to compute (invalid inputs)",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+        Text(
+            text = valuation.assumptions,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun ValuationBandChip(band: ValuationBand) {
+    val (color, content) = when (band) {
+        ValuationBand.CHEAP -> MaterialTheme.colorScheme.tertiary to MaterialTheme.colorScheme.onTertiary
+        ValuationBand.FAIR -> MaterialTheme.colorScheme.secondary to MaterialTheme.colorScheme.onSecondary
+        ValuationBand.EXPENSIVE -> MaterialTheme.colorScheme.error to MaterialTheme.colorScheme.onError
+        ValuationBand.UNKNOWN -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    AssistChip(
+        onClick = {},
+        label = {
+            Text(
+                text = when (band) {
+                    ValuationBand.CHEAP -> "Cheap"
+                    ValuationBand.FAIR -> "Fair"
+                    ValuationBand.EXPENSIVE -> "Expensive"
+                    ValuationBand.UNKNOWN -> "Unknown"
+                }
+            )
+        },
+        enabled = false,
+        colors = AssistChipDefaults.assistChipColors(
+            containerColor = color,
+            labelColor = content
+        )
+    )
+}
+
+private fun intrinsicModelLabel(model: IntrinsicModel): String = when (model) {
+    IntrinsicModel.DISCOUNTED_CASH_FLOW -> "Discounted Cash Flow"
+    IntrinsicModel.BEN_GRAHAM -> "Ben Graham Formula"
+    IntrinsicModel.DIVIDEND_DISCOUNT -> "Dividend Discount Model"
 }
 
 @Composable
@@ -785,7 +1144,7 @@ private fun mermaidHtml(definition: String): String {
                     mermaid.initialize({
                         startOnLoad: false,
                         securityLevel: "loose",
-                        theme: prefersDark ? "dark" : "neutral"
+                        theme: prefersDark · "dark" : "neutral"
                     });
                     const definition = $jsDefinition;
                     mermaid.mermaidAPI.render("graphDiv", definition, function(svg) {

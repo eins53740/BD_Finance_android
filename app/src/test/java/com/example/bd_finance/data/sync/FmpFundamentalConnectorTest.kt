@@ -39,6 +39,8 @@ class FmpFundamentalConnectorTest {
     fun `fetch builds sector snapshot and historical fundamentals`() = runTest {
         server.enqueue(jsonResponse(profilePayload()))
         server.enqueue(jsonResponse(sectorPayload()))
+        server.enqueue(jsonResponse(incomePayload()))
+        server.enqueue(jsonResponse(cashFlowPayload()))
         server.enqueue(jsonResponse(ratiosPayload()))
 
         val baseUrl = server.url("/")
@@ -50,12 +52,13 @@ class FmpFundamentalConnectorTest {
 
         val result = connector.fetch("AAPL")
 
-        assertEquals(3, server.requestCount)
+        assertEquals(5, server.requestCount)
         assertNotNull(result)
         requireNotNull(result)
 
         assertEquals("AAPL", result.ticker)
         assertEquals("Technology", result.sector)
+        assertEquals(0.27, result.operatingMargin!!, 0.0)
 
         val snapshot = result.sectorSnapshot
         assertNotNull(snapshot)
@@ -88,7 +91,7 @@ class FmpFundamentalConnectorTest {
 
     private fun profilePayload(): String =
         """[
-            {"symbol":"AAPL","sector":"Technology"}
+            {"symbol":"AAPL","sector":"Technology","returnOnEquityTTM":0.43,"returnOnAssetsTTM":0.18,"operatingMarginTTM":0.27,"netProfitMarginTTM":0.23,"debtToEquityTTM":1.4}
         ]""".trimIndent()
 
     private fun sectorPayload(): String =
@@ -112,5 +115,23 @@ class FmpFundamentalConnectorTest {
             {"calendarYear":"2021","peRatio":21.0,"pbRatio":4.8,"returnOnEquity":0.19,"operatingProfitMargin":0.27,"netProfitMargin":0.19},
             {"calendarYear":"2020","peRatio":20.0,"pbRatio":4.7,"returnOnEquity":0.18,"operatingProfitMargin":0.26,"netProfitMargin":0.18},
             {"calendarYear":"2019","peRatio":19.0,"pbRatio":4.6,"returnOnEquity":0.17,"operatingProfitMargin":0.25,"netProfitMargin":0.17}
+        ]""".trimIndent()
+
+    private fun incomePayload(): String =
+        """[
+            {"calendarYear":"2023","revenue":380000000000,"eps":6.5},
+            {"calendarYear":"2022","revenue":365000000000,"eps":6.11},
+            {"calendarYear":"2021","revenue":350000000000,"eps":5.6},
+            {"calendarYear":"2020","revenue":320000000000,"eps":5.0},
+            {"calendarYear":"2019","revenue":300000000000,"eps":4.2}
+        ]""".trimIndent()
+
+    private fun cashFlowPayload(): String =
+        """[
+            {"calendarYear":"2023","freeCashFlow":1.1E11},
+            {"calendarYear":"2022","freeCashFlow":1.05E11},
+            {"calendarYear":"2021","freeCashFlow":9.8E10},
+            {"calendarYear":"2020","freeCashFlow":8.6E10},
+            {"calendarYear":"2019","freeCashFlow":7.2E10}
         ]""".trimIndent()
 }

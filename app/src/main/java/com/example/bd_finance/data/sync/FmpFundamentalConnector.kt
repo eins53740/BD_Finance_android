@@ -48,7 +48,16 @@ class FmpFundamentalConnector(
                 }.first
             }
 
-            val historical = fetchWithRetry { loadHistoricalFundamentals(normalized) }.also {
+            val incomeStatements = fetchWithRetry { loadIncomeStatement(normalized) }.also {
+                aggregatedRetries += it.second
+            }.first
+            val cashFlows = fetchWithRetry { loadCashFlow(normalized) }.also {
+                aggregatedRetries += it.second
+            }.first
+
+            val historical = fetchWithRetry {
+                loadHistoricalFundamentals(normalized, incomeStatements, cashFlows)
+            }.also {
                 aggregatedRetries += it.second
             }.first
 
@@ -133,7 +142,11 @@ class FmpFundamentalConnector(
         )
     }
 
-    private suspend fun loadHistoricalFundamentals(ticker: String): HistoricalFundamentalSnapshot? {
+    private suspend fun loadHistoricalFundamentals(
+        ticker: String,
+        incomeStatements: Map<Int, IncomeStatementEntry>?,
+        cashFlows: Map<Int, Double?>?
+    ): HistoricalFundamentalSnapshot? {
         val url = baseUrl.newBuilder()
             .addPathSegments("api/v3/ratios/$ticker")
             .addQueryParameter("period", "annual")
@@ -150,10 +163,31 @@ class FmpFundamentalConnector(
             val obj = array.optJSONObject(index) ?: continue
             val year = obj.parseYear() ?: continue
             FundamentalMetric.values().forEach { metric ->
+                if (metric in setOf(
+                        FundamentalMetric.REVENUE,
+                        FundamentalMetric.EARNINGS_PER_SHARE,
+                        FundamentalMetric.FREE_CASH_FLOW
+                    )
+                ) {
+                    return@forEach
+                }
                 val value = obj.lookupMetric(metric)
                 val list = series[metric] ?: return@forEach
                 list.add(HistoricalDataPoint(year = year, value = value))
             }
+        }
+
+        incomeStatements?.forEach { (year, entry) ->
+            entry.revenue?.let {
+                series[FundamentalMetric.REVENUE]?.add(HistoricalDataPoint(year, it))
+            }
+            entry.eps?.let {
+                series[FundamentalMetric.EARNINGS_PER_SHARE]?.add(HistoricalDataPoint(year, it))
+            }
+        }
+
+        cashFlows?.forEach { (year, value) ->
+            series[FundamentalMetric.FREE_CASH_FLOW]?.add(HistoricalDataPoint(year, value))
         }
 
         val windows = buildMap<FundamentalMetric, HistoricalMetricWindow> {
@@ -236,6 +270,12 @@ class FmpFundamentalConnector(
                 peekDouble("operatingProfitMargin", "operatingMargin")
             FundamentalMetric.NET_MARGIN ->
                 peekDouble("netProfitMargin", "netMargin")
+            FundamentalMetric.DEBT_TO_EQUITY ->
+                peekDouble("debtEquityRatio", "longTermDebtToEquity")
+            FundamentalMetric.REVENUE,
+            FundamentalMetric.EARNINGS_PER_SHARE,
+            FundamentalMetric.FREE_CASH_FLOW ->
+                null
         }
 
     private fun Double.isFinite(): Boolean = !isInfinite() && !isNaN()
@@ -253,6 +293,54 @@ class FmpFundamentalConnector(
 
     private fun List<Double>.averageOrNull(): Double? =
         if (isEmpty()) null else this.sum() / size
+
+    private suspend fun loadIncomeStatement(ticker: String): Map<Int, IncomeStatementEntry>? {
+        val url = baseUrl.newBuilder()
+            .addPathSegments("api/v3/income-statement/$ticker")
+            .addQueryParameter("period", "annual")
+            .addQueryParameter("limit", "10")
+            .addQueryParameter("apikey", apiKey)
+            .build()
+        val response = execute(url) ?: return null
+        val array = JSONArray(response)
+        if (array.length() == 0) return emptyMap()
+        val entries = mutableMapOf<Int, IncomeStatementEntry>()
+        for (index in 0 until array.length()) {
+            val obj = array.optJSONObject(index) ?: continue
+            val year = obj.parseYear() ?: continue
+            val revenue = obj.optDoubleOrNull("revenue") ?: obj.optDoubleOrNull("revenueUSD")
+            val eps = obj.peekDouble("eps", "epsDiluted", "epsdiluted")
+            if (revenue != null || eps != null) {
+                entries[year] = IncomeStatementEntry(revenue, eps)
+            }
+        }
+        return entries
+    }
+
+    private suspend fun loadCashFlow(ticker: String): Map<Int, Double?>? {
+        val url = baseUrl.newBuilder()
+            .addPathSegments("api/v3/cash-flow-statement/$ticker")
+            .addQueryParameter("period", "annual")
+            .addQueryParameter("limit", "10")
+            .addQueryParameter("apikey", apiKey)
+            .build()
+        val response = execute(url) ?: return null
+        val array = JSONArray(response)
+        if (array.length() == 0) return emptyMap()
+        val entries = mutableMapOf<Int, Double?>()
+        for (index in 0 until array.length()) {
+            val obj = array.optJSONObject(index) ?: continue
+            val year = obj.parseYear() ?: continue
+            val freeCashFlow = obj.optDoubleOrNull("freeCashFlow")
+            entries[year] = freeCashFlow
+        }
+        return entries
+    }
+
+    private data class IncomeStatementEntry(
+        val revenue: Double?,
+        val eps: Double?
+    )
 
     companion object {
         private val DEFAULT_BASE_URL: HttpUrl = HttpUrl.Builder()
