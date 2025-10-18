@@ -8,10 +8,33 @@ plugins {
 fun escapeForBuildConfig(value: String): String =
     value.replace("\\", "\\\\").replace("\"", "\\\"")
 
-val groqApiKey = escapeForBuildConfig(project.findProperty("GROQ_API_KEY") as String? ?: "")
-val geminiApiKey = escapeForBuildConfig(project.findProperty("GEMINI_API_KEY") as String? ?: "")
-val alphaVantageKey = escapeForBuildConfig(project.findProperty("ALPHA_VANTAGE_API_KEY") as String? ?: "")
-val fmpApiKey = escapeForBuildConfig(project.findProperty("FMP_API_KEY") as String? ?: "")
+fun loadDotEnv(): Map<String, String> {
+    val envFile = rootProject.file(".env")
+    if (!envFile.exists()) return emptyMap()
+    return envFile.readLines()
+        .map { it.trim() }
+        .filter { it.isNotEmpty() && !it.startsWith("#") }
+        .mapNotNull { line ->
+            val separatorIndex = line.indexOf('=')
+            if (separatorIndex <= 0) return@mapNotNull null
+            val key = line.substring(0, separatorIndex).trim()
+            val value = line.substring(separatorIndex + 1).trim().trim('"')
+            key to value
+        }.toMap()
+}
+
+val dotenv = loadDotEnv()
+
+fun resolveSecret(name: String): String =
+    (project.findProperty(name) as String?)
+        ?: System.getenv(name)
+        ?: dotenv[name]
+        ?: ""
+
+val groqApiKey = escapeForBuildConfig(resolveSecret("GROQ_API_KEY"))
+val geminiApiKey = escapeForBuildConfig(resolveSecret("GEMINI_API_KEY"))
+val alphaVantageKey = escapeForBuildConfig(resolveSecret("ALPHA_VANTAGE_API_KEY"))
+val fmpApiKey = escapeForBuildConfig(resolveSecret("FMP_API_KEY"))
 
 android {
     namespace = "com.example.bd_finance"
@@ -88,4 +111,5 @@ dependencies {
     testImplementation(libs.androidx.work.testing)
     testImplementation(libs.robolectric)
     testImplementation(libs.okhttp.mockwebserver)
+    testImplementation("org.json:json:20231013")
 }

@@ -26,16 +26,18 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.roundToInt
+import kotlinx.coroutines.flow.StateFlow
 
 class FundamentalAnalysisEngine(
-    private val aggregator: StockMetricsAggregator
+    private val aggregator: StockMetricsAggregator,
+    private val configFlow: StateFlow<FundamentalScoringConfig> = FundamentalConfigRegistry.state()
 ) {
 
     suspend fun analyze(ticker: String, quote: StockQuote): FundamentalAnalysisResult? {
         val normalized = runCatching { aggregator.aggregate(ticker) }.getOrNull() ?: return null
-        val scoreBuilder = ScoreBuilder(quote, normalized)
-        val insights = scoreBuilder.build()
-        val valuations = IntrinsicValuationBuilder(quote, normalized).build()
+        val config = configFlow.value
+        val insights = ScoreBuilder(quote, normalized, config).build()
+        val valuations = IntrinsicValuationBuilder(quote, normalized, config).build()
         if (insights == null && valuations.isEmpty()) return null
         return FundamentalAnalysisResult(insights, valuations)
     }
@@ -48,7 +50,8 @@ data class FundamentalAnalysisResult(
 
 private class ScoreBuilder(
     private val quote: StockQuote,
-    private val metrics: NormalizedStockMetrics
+    private val metrics: NormalizedStockMetrics,
+    private val config: FundamentalScoringConfig
 ) {
 
     private val sector: SectorMedianMetrics? = metrics.sectorSnapshot?.metrics
@@ -81,7 +84,17 @@ private class ScoreBuilder(
     private fun valuationScores(): List<FundamentalMetricScore> = buildList {
         addIfNotNull(ratioScore("forward_pe", "Forward P/E", quote.forwardPe, sector?.priceToEarnings, historyMedian(FundamentalMetric.PE_RATIO), preferLower = true))
         addIfNotNull(ratioScore("price_to_book", "Price-to-Book", quote.priceToBook, sector?.priceToBook, historyMedian(FundamentalMetric.PRICE_TO_BOOK), preferLower = true))
-        addIfNotNull(ratioScore("peg", "PEG Ratio", quote.pegRatio, 1.0, 1.0, preferLower = true, fallbackLabel = "Target 1.0"))
+        addIfNotNull(
+            ratioScore(
+                id = "peg",
+                label = "PEG Ratio",
+                current = quote.pegRatio,
+                sectorBenchmark = config.pegTarget,
+                historicalBenchmark = config.pegTarget,
+                preferLower = true,
+                fallbackLabel = "Target ${formatRatio(config.pegTarget, true)}"
+            )
+        )
     }
 
     private fun profitabilityScores(): List<FundamentalMetricScore> = buildList {
@@ -128,10 +141,10 @@ private class ScoreBuilder(
     ): FundamentalMetricScore? {
         val currentValue = current ?: return null
         val weights = mutableListOf<Pair<Double, Double>>()
-        sectorBenchmark?.let { weights += 0.6 to it }
-        historicalBenchmark?.let { weights += 0.4 to it }
+        sectorBenchmark?.let { weights += config.sectorWeight to it }
+        historicalBenchmark?.let { weights += config.historyWeight to it }
         if (weights.isEmpty() && fallbackLabel != null) {
-            weights += 1.0 to (sectorBenchmark ?: historicalBenchmark ?: 1.0)
+            weights += 1.0 to (sectorBenchmark ?: historicalBenchmark ?: config.pegTarget)
         }
         if (weights.isEmpty()) return null
         val scoreValue = weightedSignal(currentValue, weights, preferLower)
@@ -155,7 +168,7 @@ private class ScoreBuilder(
         val mean = points.average()
         val variance = points.map { (it - mean).pow(2) }.average()
         val stdDev = kotlin.math.sqrt(variance)
-        val score = ((1.0 - min(stdDev / 0.05, 1.0)) * 100).roundToInt()
+        val score = ((1.0 - min(stdDev / config.marginStdDevReference, 1.0)) * 100).roundToInt()
         return FundamentalMetricScore(
             id = "margin_consistency",
             label = "Margin Consistency",
@@ -170,8 +183,8 @@ private class ScoreBuilder(
 
     private fun betaScore(beta: Double?): FundamentalMetricScore? {
         beta ?: return null
-        val capped = beta.coerceIn(0.0, 3.0)
-        val score = ((3.0 - capped) / 3.0 * 100).roundToInt()
+        val capped = beta.coerceIn(0.0, config.betaNeutralValue)
+        val score = ((config.betaNeutralValue - capped) / config.betaNeutralValue * 100).roundToInt()
         return FundamentalMetricScore(
             id = "beta",
             label = "Beta",
@@ -182,6 +195,41 @@ private class ScoreBuilder(
             decadeAverage = null,
             note = "Lower beta implies more price stability"
         )
+    }
+
+    private fun weightedSignal(current: Double, benchmarks: List<Pair<Double, Double>>, preferLower: Boolean): Double? {
+        val values = benchmarks.mapNotNull { (weight, benchmark) ->
+            signal(current, benchmark, preferLower)?.let { weight to it }
+        }
+        if (values.isEmpty()) return null
+        val weightSum = values.sumOf { it.first }
+        val aggregate = values.sumOf { it.first * it.second } / weightSum
+        return aggregate.coerceIn(-config.zScoreClamp, config.zScoreClamp)
+    }
+
+    private fun signal(current: Double, benchmark: Double, preferLower: Boolean): Double? {
+        if (benchmark == 0.0) return null
+        return if (preferLower) {
+            (benchmark - current) / abs(benchmark)
+        } else {
+            (current - benchmark) / abs(benchmark)
+        }
+    }
+
+    private fun scoreFromSignal(signal: Double): Int =
+        (((signal + config.zScoreClamp) / (2 * config.zScoreClamp)).coerceIn(0.0, 1.0) * 100).roundToInt()
+
+    private fun growthMetric(label: String, window: HistoricalMetricWindow?): GrowthMetric? {
+        val five = cagr(window?.fiveYear)
+        val ten = cagr(window?.tenYear)
+        if (five == null && ten == null) return null
+        val trend = when {
+            five != null && ten != null && five > ten + 0.01 -> GrowthTrend.ACCELERATING
+            five != null && ten != null && five + 0.01 < ten -> GrowthTrend.DECELERATING
+            five != null && ten != null -> GrowthTrend.MIXED
+            else -> GrowthTrend.UNKNOWN
+        }
+        return GrowthMetric(label, five, ten, trend)
     }
 
     private fun MutableList<HistoricalDelta>.addDelta(label: String, current: Double?, reference: Double?, preferLower: Boolean) {
@@ -198,54 +246,11 @@ private class ScoreBuilder(
         )
     }
 
-    private fun growthMetric(label: String, window: HistoricalMetricWindow?): GrowthMetric? {
-        val five = cagr(window?.fiveYear)
-        val ten = cagr(window?.tenYear)
-        if (five == null && ten == null) return null
-        val trend = when {
-            five != null && ten != null && five > ten + 0.01 -> GrowthTrend.ACCELERATING
-            five != null && ten != null && five + 0.01 < ten -> GrowthTrend.DECELERATING
-            five != null && ten != null -> GrowthTrend.MIXED
-            else -> GrowthTrend.UNKNOWN
-        }
-        return GrowthMetric(label, five, ten, trend)
-    }
+    private fun formatRatio(value: Double, preferLower: Boolean): String =
+        if (preferLower) String.format(Locale.US, "%.2fx", value) else formatPercent(value)
 
-    private fun weightedSignal(current: Double, benchmarks: List<Pair<Double, Double>>, preferLower: Boolean): Double? {
-        val values = benchmarks.mapNotNull { (weight, benchmark) ->
-            signal(current, benchmark, preferLower)?.let { weight to it }
-        }
-        if (values.isEmpty()) return null
-        val weightSum = values.sumOf { it.first }
-        val aggregate = values.sumOf { it.first * it.second } / weightSum
-        return aggregate.coerceIn(-3.0, 3.0)
-    }
-
-    private fun signal(current: Double, benchmark: Double, preferLower: Boolean): Double? {
-        if (benchmark == 0.0) return null
-        val raw = if (preferLower) {
-            (benchmark - current) / abs(benchmark)
-        } else {
-            (current - benchmark) / abs(benchmark)
-        }
-        return raw
-    }
-
-    private fun scoreFromSignal(signal: Double): Int =
-        (((signal + 3.0) / 6.0).coerceIn(0.0, 1.0) * 100).roundToInt()
-
-    private fun Int?.toStrength(): MetricStrength = when {
-        this == null -> MetricStrength.UNKNOWN
-        this >= 70 -> MetricStrength.STRONG
-        this >= 40 -> MetricStrength.NEUTRAL
-        else -> MetricStrength.WEAK
-    }
-
-    private fun formatRatio(value: Double, preferLower: Boolean): String {
-        return if (preferLower) String.format(Locale.US, "%.2fx", value) else formatPercent(value)
-    }
-
-    private fun formatPercent(value: Double?): String = value?.let { String.format(Locale.US, "%.2f%%", it * 100) } ?: "-"
+    private fun formatPercent(value: Double?): String =
+        value?.let { String.format(Locale.US, "%.2f%%", it * 100) } ?: "-"
 
     private fun historyMedian(metric: FundamentalMetric): Double? =
         history?.metrics?.get(metric)?.tenYear?.median
@@ -272,7 +277,8 @@ private class ScoreBuilder(
 
 private class IntrinsicValuationBuilder(
     private val quote: StockQuote,
-    private val metrics: NormalizedStockMetrics
+    private val metrics: NormalizedStockMetrics,
+    private val config: FundamentalScoringConfig
 ) {
 
     fun build(): List<IntrinsicValuation> {
@@ -305,8 +311,8 @@ private class IntrinsicValuationBuilder(
         if (shares <= 0) return insufficient(IntrinsicModel.DISCOUNTED_CASH_FLOW, "Invalid share count")
         val fcfPerShare = latest / shares
         val growthRate = fcfCagr.coerceIn(0.0, 0.15)
-        val discountRate = max(0.08, growthRate + 0.05)
-        val terminalGrowth = 0.025
+        val discountRate = max(config.dcfDiscountFloor, growthRate + 0.05)
+        val terminalGrowth = config.dcfTerminalGrowth
         var projected = fcfPerShare
         var presentValue = 0.0
         for (year in 1..5) {
@@ -359,8 +365,8 @@ private class IntrinsicValuationBuilder(
             IntrinsicModel.DIVIDEND_DISCOUNT,
             "Missing price"
         )
-        val growth = (quote.dividendYield ?: 0.0).coerceIn(0.0, 0.06)
-        val discountRate = max(0.08, growth + 0.05)
+        val growth = (quote.dividendYield ?: 0.0).coerceIn(0.0, config.dividendGrowthCap)
+        val discountRate = max(config.dividendDiscountFloor, growth + 0.05)
         if (discountRate <= growth) {
             return IntrinsicValuation(
                 model = IntrinsicModel.DIVIDEND_DISCOUNT,
@@ -426,4 +432,11 @@ private class IntrinsicValuationBuilder(
     }
 
     private fun formatPercent(value: Double): String = String.format(Locale.US, "%.2f%%", value * 100)
+}
+
+private fun Int?.toStrength(): MetricStrength = when {
+    this == null -> MetricStrength.UNKNOWN
+    this >= 70 -> MetricStrength.STRONG
+    this >= 40 -> MetricStrength.NEUTRAL
+    else -> MetricStrength.WEAK
 }

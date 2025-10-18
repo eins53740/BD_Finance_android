@@ -17,10 +17,16 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class FundamentalAnalysisEngineTest {
+
+    @Before
+    fun resetConfig() {
+        FundamentalConfigRegistry.replace(FundamentalScoringConfig())
+    }
 
     @Test
     fun `analyze returns insights and intrinsic valuations`() = runTest {

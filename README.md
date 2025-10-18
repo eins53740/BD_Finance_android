@@ -26,6 +26,8 @@ BD Finance is a Jetpack Compose Android client that turns any stock ticker into 
    ```
    Leaving them blank triggers the deterministic fallback copy in the Second Opinion section. Sector medians and long-term fundamentals fall back to cached data when FMP is unavailable.
 
+   Alternatively, you can create a `.env` file at the project root with the same keys and values; Gradle now loads secrets from `.env`, environment variables, or `gradle.properties` in that order.
+
 ## Changing the App Icon
 1. Prepare a square 512x512 PNG (transparent background recommended).
 2. Replace the existing files under `app/src/main/res/mipmap-*/ic_launcher.png` and `ic_launcher_round.png`. The fastest method is to use **Android Studio > Image Asset**:
@@ -49,6 +51,11 @@ Created by **BD** - a retail-investor-friendly tool shared with friends who want
 Issues and improvements are welcome via pull requests. When reporting bugs, include the ticker, device/emulator, and console logs (especially around Yahoo/Groq/Gemini calls) so we can reproduce quickly.
 
 Enjoy the insights and happy investing!
+
+## Fundamental Scorecard Tuning
+- The weighting, z-score clamp, and valuation assumptions used by the new scorecard default to 60/40 (sector/decade) with a clamp of +/- 3.
+- To override at runtime, call `FundamentalConfigOverrides.applyJson(jsonString)` (for example from a Remote Config fetch or debug menu) with fields like `sectorWeight`, `historyWeight`, `zScoreClamp`, `pegTarget`, `dcfDiscountFloor`, etc.
+- Current overrides are stored in-memory via `FundamentalConfigRegistry` and immediately applied to subsequent analyses; calling `FundamentalConfigRegistry.replace(FundamentalScoringConfig())` resets to defaults.
 
 ## Background Sync & Data Sources
 - Yahoo Finance remains the primary live quote provider.
