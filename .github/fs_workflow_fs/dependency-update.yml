@@ -1,0 +1,192 @@
+name: Dependency Update
+
+on:
+  schedule:
+    # Run every Monday at 9:00 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: "3.11"
+  JAVA_VERSION: "17"
+
+jobs:
+  python-dependencies:
+    name: Python Dependencies Update
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-tools
+
+      - name: Check for outdated packages
+        id: check_outdated
+        run: |
+          pip list --outdated --format=json > outdated-packages.json
+          if [ -s outdated-packages.json ]; then
+            echo "has_updates=true" >> $GITHUB_OUTPUT
+            echo "Found outdated packages:"
+            cat outdated-packages.json
+          else
+            echo "has_updates=false" >> $GITHUB_OUTPUT
+            echo "No outdated packages found"
+          fi
+
+      - name: Create PR for Python updates
+        if: steps.check_outdated.outputs.has_updates == 'true'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update Python dependencies"
+          title: "Update Python Dependencies"
+          body: |
+            ## Python Dependency Updates
+            
+            This PR updates outdated Python packages to their latest versions.
+            
+            ### Updated Packages:
+            - See the outdated-packages.json file for details
+            
+            ### Security Notes:
+            - Please review all updates for breaking changes
+            - Test thoroughly before merging
+            - Consider updating requirements.txt manually if needed
+            
+            ### Checklist:
+            - [ ] Review package changes
+            - [ ] Run tests locally
+            - [ ] Check for breaking changes
+            - [ ] Update documentation if needed
+          branch: dependency-updates/python-$(date +%Y%m%d)
+          delete-branch: true
+
+  android-dependencies:
+    name: Android Dependencies Update
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+
+      - name: Check for Gradle dependency updates
+        id: check_gradle_updates
+        run: |
+          ./gradlew dependencyUpdates --no-daemon > dependency-updates.txt 2>&1 || true
+          if grep -q "The following dependencies have later versions" dependency-updates.txt; then
+            echo "has_updates=true" >> $GITHUB_OUTPUT
+            echo "Found Gradle dependency updates:"
+            cat dependency-updates.txt
+          else
+            echo "has_updates=false" >> $GITHUB_OUTPUT
+            echo "No Gradle dependency updates found"
+          fi
+
+      - name: Create PR for Android updates
+        if: steps.check_gradle_updates.outputs.has_updates == 'true'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update Android dependencies"
+          title: "Update Android Dependencies"
+          body: |
+            ## Android Dependency Updates
+            
+            This PR updates outdated Android/Gradle dependencies to their latest versions.
+            
+            ### Updated Dependencies:
+            - See the dependency-updates.txt file for details
+            
+            ### Security Notes:
+            - Please review all updates for breaking changes
+            - Test Android builds thoroughly
+            - Check for API changes in updated libraries
+            
+            ### Checklist:
+            - [ ] Review dependency changes
+            - [ ] Run Android tests locally
+            - [ ] Check for breaking changes
+            - [ ] Update documentation if needed
+          branch: dependency-updates/android-$(date +%Y%m%d)
+          delete-branch: true
+
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install security tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install safety bandit pip-audit
+
+      - name: Python security audit
+        run: |
+          echo "## Python Security Audit Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Safety Check:" >> $GITHUB_STEP_SUMMARY
+          safety check -r requirements.txt -r requirements-dev.txt >> $GITHUB_STEP_SUMMARY || true
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Bandit Security Scan:" >> $GITHUB_STEP_SUMMARY
+          bandit -r . -f json -o bandit-report.json || true
+          if [ -f bandit-report.json ]; then
+            echo "Bandit scan completed. See bandit-report.json for details." >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Pip Audit:" >> $GITHUB_STEP_SUMMARY
+          pip-audit --format=json --output=pip-audit-report.json || true
+          if [ -f pip-audit-report.json ]; then
+            echo "Pip audit completed. See pip-audit-report.json for details." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-audit-reports
+          path: |
+            bandit-report.json
+            pip-audit-report.json
+          retention-days: 30

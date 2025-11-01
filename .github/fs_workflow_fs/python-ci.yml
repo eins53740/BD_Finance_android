@@ -1,0 +1,157 @@
+name: Python CI
+
+on:
+  push:
+    branches: [ main]
+    paths:
+      - "**/*.py"
+      - "requirements*.txt"
+      - "pyproject.toml"
+      - "setup.py"
+      - "tests/**"
+      - ".github/workflows/python-ci.yml"
+  pull_request:
+    branches: [ main]
+    paths:
+      - "**/*.py"
+      - "requirements*.txt"
+      - "pyproject.toml"
+      - "setup.py"
+      - "tests/**"
+      - ".github/workflows/python-ci.yml"
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  python-backend:
+    name: Python Backend Tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Ruff linting
+        run: |
+          ruff check . --fix
+          ruff format --check .
+
+      - name: Black format check
+        run: |
+          black --check --diff .
+
+      - name: Type checking with mypy
+        run: |
+          mypy . --ignore-missing-imports || true
+
+      - name: Run unit tests
+        run: |
+          pytest tests/ -v --cov=. --cov-report=xml --cov-report=html
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+
+  python-security:
+    name: Python Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install security tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install safety bandit pip-audit
+
+      - name: Python security check with Safety
+        run: |
+          safety check -r requirements.txt -r requirements-dev.txt
+
+      - name: Python security check with Bandit
+        run: |
+          bandit -r . -f json -o bandit-report.json || true
+
+      - name: Python security check with pip-audit
+        run: |
+          pip-audit --format=json --output=pip-audit-report.json || true
+
+      - name: Upload security scan results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: python-security-results
+          path: |
+            bandit-report.json
+            pip-audit-report.json
+          retention-days: 30
+
+  dependency-check:
+    name: Dependency Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install pip-tools
+        run: pip install pip-tools
+
+      - name: Check for outdated Python packages
+        run: |
+          pip list --outdated --format=json > outdated-packages.json || true
+
+      - name: Check for vulnerable packages
+        run: |
+          pip-audit --format=json --output=vulnerable-packages.json || true
+
+      - name: Upload dependency check results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: python-dependency-results
+          path: |
+            outdated-packages.json
+            vulnerable-packages.json
+          retention-days: 7
