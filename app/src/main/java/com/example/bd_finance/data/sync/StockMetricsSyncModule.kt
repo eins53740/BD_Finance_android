@@ -3,19 +3,30 @@ package com.example.bd_finance.data.sync
 import android.content.Context
 import androidx.room.Room
 import com.example.bd_finance.BuildConfig
+import com.example.bd_finance.data.BDFinanceDatabase
+import com.example.bd_finance.data.DatabaseMigrations
 import com.example.bd_finance.data.network.YahooFinanceClient
+import com.example.bd_finance.data.portfolio.PortfolioRepository
+import com.example.bd_finance.data.watchlist.WatchlistRepository
 import okhttp3.OkHttpClient
 import kotlin.collections.buildList
 
 object StockMetricsSyncModule {
 
-    fun provideDatabase(context: Context): StockMetricsDatabase =
-        Room.databaseBuilder(context, StockMetricsDatabase::class.java, "stock_metrics.db")
-            .addMigrations(*StockMetricsMigrations.ALL)
+    fun provideDatabase(context: Context): BDFinanceDatabase =
+        Room.databaseBuilder(context, BDFinanceDatabase::class.java, "bd_finance.db")
+            .addMigrations(*StockMetricsMigrations.ALL, *DatabaseMigrations.ALL)
+            .fallbackToDestructiveMigration() // For development only
             .build()
 
-    fun provideRepository(database: StockMetricsDatabase): StockMetricsRepository =
+    fun provideRepository(database: BDFinanceDatabase): StockMetricsRepository =
         RoomStockMetricsRepository(database.stockMetricsDao())
+
+    fun provideWatchlistRepository(database: BDFinanceDatabase): WatchlistRepository =
+        WatchlistRepository(database.watchlistDao())
+
+    fun providePortfolioRepository(database: BDFinanceDatabase): PortfolioRepository =
+        PortfolioRepository(database.portfolioDao())
 
     fun provideAggregator(okHttpClient: OkHttpClient, yahooClient: YahooFinanceClient): StockMetricsAggregator {
         val connectors = buildList {

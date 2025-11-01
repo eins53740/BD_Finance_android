@@ -51,10 +51,7 @@ interface StockMetricsDao {
     fun observeAll(): Flow<List<StockMetricsEntity>>
 }
 
-@Database(entities = [StockMetricsEntity::class], version = 3, exportSchema = false)
-abstract class StockMetricsDatabase : RoomDatabase() {
-    abstract fun stockMetricsDao(): StockMetricsDao
-}
+// Database moved to BDFinanceDatabase.kt - now includes watchlist and portfolio tables
 
 interface StockMetricsRepository {
     suspend fun save(metrics: NormalizedStockMetrics)

@@ -90,7 +90,10 @@ import java.util.Locale
 import org.json.JSONObject
 
 @Composable
-fun StockEvaluatorRoot() {
+fun StockEvaluatorRoot(
+    watchlistRepository: com.example.bd_finance.data.watchlist.WatchlistRepository? = null,
+    portfolioRepository: com.example.bd_finance.data.portfolio.PortfolioRepository? = null
+) {
     val repository = remember { StockAnalysisRepository.default() }
     val viewModel: StockEvaluatorViewModel = viewModel(
         factory = StockEvaluatorViewModelFactory(repository)
@@ -99,7 +102,9 @@ fun StockEvaluatorRoot() {
     StockEvaluatorScreen(
         state = state,
         onAnalyze = viewModel::analyzeTicker,
-        onRetry = viewModel::retry
+        onRetry = viewModel::retry,
+        watchlistRepository = watchlistRepository,
+        portfolioRepository = portfolioRepository
     )
 }
 
@@ -108,7 +113,9 @@ fun StockEvaluatorRoot() {
 fun StockEvaluatorScreen(
     state: StockEvaluatorUiState,
     onAnalyze: (String) -> Unit,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    watchlistRepository: com.example.bd_finance.data.watchlist.WatchlistRepository? = null,
+    portfolioRepository: com.example.bd_finance.data.portfolio.PortfolioRepository? = null
 ) {
     var tickerInput by rememberSaveable { mutableStateOf("") }
     val isLoading = state is StockEvaluatorUiState.Loading
@@ -160,7 +167,9 @@ fun StockEvaluatorScreen(
                 is StockEvaluatorUiState.Success -> {
                     AnalysisContent(
                         analysis = state.analysis,
-                        onRefresh = { onAnalyze(state.analysis.summary.ticker) }
+                        onRefresh = { onAnalyze(state.analysis.summary.ticker) },
+                        watchlistRepository = watchlistRepository,
+                        portfolioRepository = portfolioRepository
                     )
                 }
             }
@@ -319,12 +328,14 @@ private fun ErrorState(
 @Composable
 private fun AnalysisContent(
     analysis: StockAnalysis,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    watchlistRepository: com.example.bd_finance.data.watchlist.WatchlistRepository? = null,
+    portfolioRepository: com.example.bd_finance.data.portfolio.PortfolioRepository? = null
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        SummaryCard(analysis, onRefresh)
+        SummaryCard(analysis, onRefresh, watchlistRepository, portfolioRepository)
         MetricsSection(analysis.metrics)
         FundamentalsSection(analysis.fundamentalInsights)
         IntrinsicValuationsSection(
@@ -345,10 +356,15 @@ private fun AnalysisContent(
 @Composable
 private fun SummaryCard(
     analysis: StockAnalysis,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    watchlistRepository: com.example.bd_finance.data.watchlist.WatchlistRepository? = null,
+    portfolioRepository: com.example.bd_finance.data.portfolio.PortfolioRepository? = null
 ) {
     val summary = analysis.summary
     val verdictColors = verdictColors(summary.verdict)
+    var showSnackbar by remember { mutableStateOf<String?>(null) }
+    var showAddToPortfolioDialog by remember { mutableStateOf(false) }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = verdictColors.cardColor)
@@ -409,6 +425,71 @@ private fun SummaryCard(
                 text = summary.verdictNarrative,
                 style = MaterialTheme.typography.bodyMedium
             )
+
+            // Action Buttons
+            if (watchlistRepository != null || portfolioRepository != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (watchlistRepository != null) {
+                        OutlinedButton(
+                            onClick = {
+                                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                                    try {
+                                        watchlistRepository.add(
+                                            com.example.bd_finance.data.watchlist.WatchlistItem(
+                                                ticker = summary.ticker,
+                                                companyName = summary.companyName,
+                                                addedDate = java.time.Instant.now(),
+                                                lastPrice = summary.price,
+                                                lastPriceChange = summary.changePercent,
+                                                lastRecommendation = summary.verdict,
+                                                lastUpdated = java.time.Instant.now()
+                                            )
+                                        )
+                                        showSnackbar = "Added to watchlist"
+                                    } catch (e: Exception) {
+                                        showSnackbar = "Already in watchlist"
+                                    }
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Watchlist")
+                        }
+                    }
+                    if (portfolioRepository != null) {
+                        OutlinedButton(
+                            onClick = { showAddToPortfolioDialog = true },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Portfolio")
+                        }
+                    }
+                }
+            }
+
+            if (showAddToPortfolioDialog && portfolioRepository != null) {
+                com.example.bd_finance.ui.portfolio.AddHoldingDialog(
+                    initialTicker = summary.ticker,
+                    initialCompanyName = summary.companyName,
+                    initialPrice = summary.price,
+                    onDismiss = { showAddToPortfolioDialog = false },
+                    onConfirm = { holding ->
+                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                            try {
+                                portfolioRepository.add(holding)
+                                showSnackbar = "Added to portfolio"
+                            } catch (e: Exception) {
+                                showSnackbar = "Error adding to portfolio: ${e.message}"
+                            }
+                        }
+                        showAddToPortfolioDialog = false
+                    }
+                )
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1051,10 +1132,10 @@ private fun DividendSection(dividendInsight: DividendInsight?) {
     )
     val yieldText = dividendInsight.yield?.let { value ->
         String.format(java.util.Locale.US, "%.2f%%", value)
-    } ?: "—"
+    } ?: "ï¿½"
     val payoutText = dividendInsight.payoutRatio?.let { ratio ->
         String.format(java.util.Locale.US, "%.0f%%", ratio * 100)
-    } ?: "—"
+    } ?: "ï¿½"
     Card(
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -1144,7 +1225,7 @@ private fun mermaidHtml(definition: String): String {
                     mermaid.initialize({
                         startOnLoad: false,
                         securityLevel: "loose",
-                        theme: prefersDark · "dark" : "neutral"
+                        theme: prefersDark ï¿½ "dark" : "neutral"
                     });
                     const definition = $jsDefinition;
                     mermaid.mermaidAPI.render("graphDiv", definition, function(svg) {

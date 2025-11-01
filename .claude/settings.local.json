@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew.bat:*)",
+      "Bash(java:*)",
+      "Bash(where java)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

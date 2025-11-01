@@ -4,8 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.material3.Surface
-import com.example.bd_finance.ui.StockEvaluatorRoot
+import com.example.bd_finance.ui.BDFinanceApp
 import com.example.bd_finance.ui.theme.BD_FinanceTheme
 
 class MainActivity : ComponentActivity() {
@@ -14,9 +13,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             BD_FinanceTheme {
-                Surface {
-                    StockEvaluatorRoot()
-                }
+                BDFinanceApp()
             }
         }
     }
