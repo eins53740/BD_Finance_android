@@ -43,7 +43,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.bd_finance"
+        applicationId = "com.bd.finance"
         minSdk = 33
         targetSdk = 36
         versionCode = 1

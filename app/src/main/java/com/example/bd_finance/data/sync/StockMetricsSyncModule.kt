@@ -27,7 +27,7 @@ object StockMetricsSyncModule {
         return DefaultStockMetricsAggregator(connectors)
     }
 
-    fun provideTickerProvider(): TickerProvider = DefaultTickerProvider()
+    fun provideTickerProvider(context: Context): TickerProvider = DefaultTickerProvider(context)
 
     fun provideWorkerFactory(
         context: Context,
@@ -37,7 +37,7 @@ object StockMetricsSyncModule {
         val database = provideDatabase(context)
         val repository = provideRepository(database)
         val aggregator = provideAggregator(okHttpClient, yahooClient)
-        val tickerProvider = provideTickerProvider()
+        val tickerProvider = provideTickerProvider(context)
         return StockMetricsWorkerFactory(aggregator, repository, tickerProvider)
     }
 

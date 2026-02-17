@@ -55,8 +55,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.bd_finance.data.StockAnalysisRepository
@@ -91,7 +94,8 @@ import org.json.JSONObject
 
 @Composable
 fun StockEvaluatorRoot() {
-    val repository = remember { StockAnalysisRepository.default() }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val repository = remember { StockAnalysisRepository.default(context) }
     val viewModel: StockEvaluatorViewModel = viewModel(
         factory = StockEvaluatorViewModelFactory(repository)
     )
@@ -195,6 +199,8 @@ private fun TickerInputCard(
                 label = { Text(text = "Stock Ticker") },
                 placeholder = { Text(text = "Enter stock ticker (e.g., AAPL)") },
                 singleLine = true,
+                keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { if (ticker.isNotBlank() && !isLoading) onAnalyze() }),
                 modifier = Modifier.fillMaxWidth()
             )
             Button(
@@ -1051,10 +1057,10 @@ private fun DividendSection(dividendInsight: DividendInsight?) {
     )
     val yieldText = dividendInsight.yield?.let { value ->
         String.format(java.util.Locale.US, "%.2f%%", value)
-    } ?: "—"
+    } ?: "\u2014"
     val payoutText = dividendInsight.payoutRatio?.let { ratio ->
         String.format(java.util.Locale.US, "%.0f%%", ratio * 100)
-    } ?: "—"
+    } ?: "\u2014"
     Card(
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -1144,7 +1150,7 @@ private fun mermaidHtml(definition: String): String {
                     mermaid.initialize({
                         startOnLoad: false,
                         securityLevel: "loose",
-                        theme: prefersDark · "dark" : "neutral"
+                        theme: prefersDark ? "dark" : "neutral"
                     });
                     const definition = $jsDefinition;
                     mermaid.mermaidAPI.render("graphDiv", definition, function(svg) {
@@ -1187,7 +1193,6 @@ private fun LlmOpinionSection(html: String?) {
     SignatureFooter()
 }
 
-@SuppressLint("SetJavaScriptEnabled")
 @Composable
 private fun HtmlBlock(content: String) {
     AndroidView(
@@ -1294,7 +1299,7 @@ private fun SignatureFooter() {
             modifier = Modifier.height(24.dp)
         )
         Text(
-            text = "BD Finance 2025\u2122 â€” from BD, to my friends",
+            text = "BD Finance ${java.time.Year.now().value}\u2122 \u2014 from BD, to my friends",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
         )

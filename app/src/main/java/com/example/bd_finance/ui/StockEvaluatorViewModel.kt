@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.net.UnknownHostException
 
 sealed interface StockEvaluatorUiState {
     data object Idle : StockEvaluatorUiState
@@ -37,9 +38,15 @@ class StockEvaluatorViewModel(
                 val result = repository.analyze(normalized)
                 StockEvaluatorUiState.Success(result)
             } catch (ex: Exception) {
+                val message = when (ex) {
+                    is UnknownHostException -> "No internet connection. Check your network and try again."
+                    is java.net.SocketTimeoutException -> "Request timed out. Try again in a moment."
+                    is java.io.IOException -> "Network error: ${ex.message}"
+                    else -> ex.message ?: "Unexpected error"
+                }
                 StockEvaluatorUiState.Error(
                     ticker = normalized.uppercase(),
-                    message = ex.message ?: "Unexpected error"
+                    message = message
                 )
             }
         }

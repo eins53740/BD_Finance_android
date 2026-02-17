@@ -365,7 +365,12 @@ private class IntrinsicValuationBuilder(
             IntrinsicModel.DIVIDEND_DISCOUNT,
             "Missing price"
         )
-        val growth = (quote.dividendYield ?: 0.0).coerceIn(0.0, config.dividendGrowthCap)
+        val epsCagr = cagr(
+            metrics.historicalFundamentals
+                ?.metrics?.get(FundamentalMetric.EARNINGS_PER_SHARE)
+                ?.fiveYear
+        )
+        val growth = (epsCagr ?: config.dcfTerminalGrowth).coerceIn(0.0, config.dividendGrowthCap)
         val discountRate = max(config.dividendDiscountFloor, growth + 0.05)
         if (discountRate <= growth) {
             return IntrinsicValuation(

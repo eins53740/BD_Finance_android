@@ -28,6 +28,7 @@ import okhttp3.logging.HttpLoggingInterceptor
 import java.net.CookieManager
 import java.net.CookiePolicy
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 class StockAnalysisRepository(
     private val financeClient: YahooFinanceClient,
@@ -35,6 +36,7 @@ class StockAnalysisRepository(
     private val mermaidBuilder: MermaidDefinitionBuilder,
     private val llmClient: LargeLanguageModelClient?,
     private val fundamentalEngine: FundamentalAnalysisEngine?,
+    private val tickerProvider: com.example.bd_finance.data.sync.TickerProvider? = null,
     private val cacheTtlMillis: Long = BuildConfig.CACHE_TTL_MS
 ) {
 
@@ -55,6 +57,7 @@ class StockAnalysisRepository(
         if (cached != null) return cached
 
         val result = fetchAndEvaluate(normalized)
+        tickerProvider?.addTicker(normalized)
 
         mutex.withLock {
             cache[normalized] = CachedAnalysis(System.currentTimeMillis(), result)
@@ -166,8 +169,8 @@ class StockAnalysisRepository(
         }
     }
 
-    fun clearCache() {
-        cache.clear()
+    suspend fun clearCache() {
+        mutex.withLock { cache.clear() }
     }
 
     private data class CachedAnalysis(
@@ -183,7 +186,7 @@ class StockAnalysisRepository(
         private const val TAG = "StockAnalysisRepo"
         private val evaluationThresholds = EvaluationThresholds()
 
-        fun default(): StockAnalysisRepository {
+        fun default(context: android.content.Context? = null): StockAnalysisRepository {
             val logging = HttpLoggingInterceptor().apply {
                 level = HttpLoggingInterceptor.Level.BASIC
             }
@@ -193,6 +196,8 @@ class StockAnalysisRepository(
             val client = OkHttpClient.Builder()
                 .cookieJar(JavaNetCookieJar(cookieManager))
                 .addInterceptor(logging)
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .readTimeout(20, TimeUnit.SECONDS)
                 .build()
 
             val financeClient = YahooFinanceClient(client)
@@ -206,12 +211,14 @@ class StockAnalysisRepository(
             val aggregator: StockMetricsAggregator =
                 StockMetricsSyncModule.provideAggregator(client, financeClient)
             val fundamentalEngine = FundamentalAnalysisEngine(aggregator)
+            val tickerProv = context?.let { com.example.bd_finance.data.sync.DefaultTickerProvider(it) }
             return StockAnalysisRepository(
                 financeClient = financeClient,
                 evaluator = evaluator,
                 mermaidBuilder = mermaidBuilder,
                 llmClient = llmClient,
-                fundamentalEngine = fundamentalEngine
+                fundamentalEngine = fundamentalEngine,
+                tickerProvider = tickerProv
             )
         }
     }
