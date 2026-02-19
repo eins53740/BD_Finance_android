@@ -28,6 +28,14 @@ output.json
 .idea/deploymentTargetDropDown.xml
 .idea/render.experimental.xml
 
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# Claude Code
+.claude/
+
 # macOS
 .DS_Store
 

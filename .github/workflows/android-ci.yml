@@ -84,7 +84,8 @@ jobs:
         run: ./gradlew test
 
       - name: Android instrumented tests
-        run: ./gradlew connectedAndroidTest || true
+        continue-on-error: true
+        run: ./gradlew connectedAndroidTest
 
       - name: Build debug APK
         run: ./gradlew assembleDebug
@@ -146,7 +147,8 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Dependency vulnerability check
-        run: ./gradlew dependencyCheckAnalyze || true
+        continue-on-error: true
+        run: ./gradlew dependencyCheckAnalyze
 
       - name: Upload security scan results
         uses: actions/upload-artifact@v4

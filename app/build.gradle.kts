@@ -37,6 +37,9 @@ val alphaVantageKey = escapeForBuildConfig(resolveSecret("ALPHA_VANTAGE_API_KEY"
 val fmpApiKey = escapeForBuildConfig(resolveSecret("FMP_API_KEY"))
 
 android {
+    // namespace = code/R package; applicationId = Play Store identity.
+    // These intentionally differ: source lives under com.example.bd_finance
+    // while the published app uses com.bd.finance.
     namespace = "com.example.bd_finance"
     compileSdk {
         version = release(36)
@@ -111,5 +114,5 @@ dependencies {
     testImplementation(libs.androidx.work.testing)
     testImplementation(libs.robolectric)
     testImplementation(libs.okhttp.mockwebserver)
-    testImplementation("org.json:json:20231013")
+    testImplementation(libs.org.json)
 }

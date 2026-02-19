@@ -10,23 +10,30 @@ BD Finance is a Jetpack Compose Android client that turns any stock ticker into 
 - **Mobile-Ready** - Compose UI, Material 3 styling, dark-mode support, and caching for quick repeats keep analysis friendly on phones and tablets.
 
 ## Getting Started
-1. **Prerequisites** - Android Studio Giraffe+ (or VS Code with Android extensions) and JDK 17/21. The project ships with the Gradle wrapper and uses the Android Studio bundled JBR.
+1. **Prerequisites**
+   - Android Studio Hedgehog (2023.1.1) or newer — the bundled JDK 17 is sufficient.
+   - Alternatively: VS Code with Android extensions and a standalone JDK 17.
 2. **Clone & Build**
    ```bash
    git clone <repo-url> BD_Finance_android
    cd BD_Finance_android
+   cp .env.example .env   # then fill in any keys you have
    ./gradlew :app:assembleDebug
    ```
-3. **Run** - Deploy from Android Studio (`Run > Run 'app'`) or install `app/build/outputs/apk/debug/app-debug.apk`.
-4. **Optional API Keys** - Add the following to `gradle.properties` (or via Android Studio Run Config):
-   ```properties
-   GROQ_API_KEY=sk-...
-   GEMINI_API_KEY=AIza...
-   FMP_API_KEY=fnm_...
-   ```
-   Leaving them blank triggers the deterministic fallback copy in the Second Opinion section. Sector medians and long-term fundamentals fall back to cached data when FMP is unavailable.
+3. **Run** — Deploy from Android Studio (`Run > Run 'app'`) or install `app/build/outputs/apk/debug/app-debug.apk`.
+4. **Optional API Keys** — All keys are optional. The app works fully without them,
+   falling back to deterministic analysis and cached data.
 
-   Alternatively, you can create a `.env` file at the project root with the same keys and values; Gradle now loads secrets from `.env`, environment variables, or `gradle.properties` in that order.
+   Create a `.env` file at the project root (see `.env.example`):
+   ```bash
+   GROQ_API_KEY=gsk_...      # Groq LLaMA — primary LLM commentary
+   GEMINI_API_KEY=AIza...     # Google Gemini — LLM fallback
+   FMP_API_KEY=fnm_...        # Financial Modeling Prep — sector medians
+   ALPHA_VANTAGE_API_KEY=...  # Alpha Vantage — PEG, beta fallback
+   ```
+
+   Secrets resolve in order: `gradle.properties` → environment variables → `.env` file.
+   **Never commit real keys to `gradle.properties`** — use `.env` (git-ignored) instead.
 
 ## Changing the App Icon
 1. Prepare a square 512x512 PNG (transparent background recommended).
@@ -59,6 +66,6 @@ Enjoy the insights and happy investing!
 
 ## Background Sync & Data Sources
 - Yahoo Finance remains the primary live quote provider.
-- Alpha Vantage acts as a free fallback for PEG, beta, and supplementary fundamentals (set `ALPHA_VANTAGE_API_KEY` in `gradle.properties`).
-- Financial Modeling Prep (set `FMP_API_KEY`) unlocks sector medians and 5Y/10Y scorecard history with Alpha Vantage fallback when quotas are exhausted.
+- Alpha Vantage acts as a free fallback for PEG, beta, and supplementary fundamentals (set `ALPHA_VANTAGE_API_KEY` in `.env`).
+- Financial Modeling Prep (set `FMP_API_KEY` in `.env`) unlocks sector medians and 5Y/10Y scorecard history with Alpha Vantage fallback when quotas are exhausted.
 - WorkManager schedules periodic refreshes that hydrate a Room-backed metrics cache consumed by the Compose UI.
