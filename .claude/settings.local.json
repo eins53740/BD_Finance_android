@@ -5,7 +5,14 @@
       "Bash(reg query:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push)"
+      "Bash(git push)",
+      "Bash(gh issue list:*)",
+      "Bash(wc:*)",
+      "Bash(while read f)",
+      "Bash(do basename \"$f\")",
+      "Bash(done)",
+      "Bash(comm -12:*)",
+      "Bash(comm:*)"
     ]
   }
 }
