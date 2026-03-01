@@ -41,12 +41,12 @@ android {
     // These intentionally differ: source lives under com.example.bd_finance
     // while the published app uses com.bd.finance.
     namespace = "com.example.bd_finance"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.bd.finance"
         minSdk = 33
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 

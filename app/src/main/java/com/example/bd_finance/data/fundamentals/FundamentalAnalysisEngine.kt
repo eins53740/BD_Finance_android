@@ -425,8 +425,8 @@ private class IntrinsicValuationBuilder(
             status = IntrinsicValuationStatus.INSUFFICIENT_DATA
         )
 
-    private fun cagr(window: HistoricalWindow): Double? {
-        val points = window.points.filter { it.value != null }.sortedBy { it.year }
+    private fun cagr(window: HistoricalWindow?): Double? {
+        val points = window?.points?.filter { it.value != null }?.sortedBy { it.year } ?: return null
         if (points.size < 2) return null
         val start = points.first().value ?: return null
         val end = points.last().value ?: return null
